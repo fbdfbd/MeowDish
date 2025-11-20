@@ -6,7 +6,7 @@ using Meow.ECS.Components;
 namespace Meow.ECS.Systems
 {
     [BurstCompile]
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
     [UpdateAfter(typeof(PlayerMovementSystem))]
     public partial struct PlayerAnimationSystem : ISystem
     {

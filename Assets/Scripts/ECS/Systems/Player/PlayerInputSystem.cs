@@ -2,60 +2,49 @@ using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 using Meow.ECS.Components;
-using Meow.UI;
+using Meow.ScriptableObjects;
 
 namespace Meow.ECS.Systems
 {
     /// <summary>
-    /// VirtualJoystick 입력을 ECS로 전달
-    /// 
-    /// MonoBehaviour 참조 때문에 Burst 사용 불가
+    /// ScriptableObject를 통한 입력 처리
     /// </summary>
     [UpdateInGroup(typeof(SimulationSystemGroup), OrderFirst = true)]
     public partial class PlayerInputSystem : SystemBase
     {
-        private GameObject joystickObject;
-        private bool isInitialized;
+        // ? ScriptableObject 참조
+        private InputReferences _inputReferences;
 
         protected override void OnCreate()
         {
             RequireForUpdate<PlayerInputComponent>();
-        }
 
-        protected override void OnStartRunning()
-        {
-            if (!isInitialized)
+            // ? Resources 폴더에서 로드
+            _inputReferences = Resources.Load<InputReferences>("InputReferences");
+
+            if (_inputReferences == null)
             {
-                // VirtualJoystick 찾기
-                joystickObject = GameObject.Find("Joystick Background");
-                if (joystickObject != null)
-                {
-                    Debug.Log("[PlayerInputSystem] VirtualJoystick found!");
-                    isInitialized = true;
-                }
-                else
-                {
-                    Debug.LogWarning("[PlayerInputSystem] VirtualJoystick not found! " +
-                        "Create UI with name 'Joystick Background'");
-                }
+                Debug.LogError("[PlayerInputSystem] InputReferences not found in Resources folder! " +
+                    "Create it at 'Assets/Resources/InputReferences.asset'");
+            }
+            else
+            {
+                Debug.Log("[PlayerInputSystem] InputReferences loaded successfully!");
             }
         }
 
         protected override void OnUpdate()
         {
-            // VirtualJoystick이 없으면 키보드 입력 사용
+            // ========================================
+            // 1. 이동 입력
+            // ========================================
             float2 input = float2.zero;
-            bool interactPressed = false;
 
-            if (joystickObject != null)
+            // ? ScriptableObject를 통해 접근
+            if (_inputReferences != null && _inputReferences.joystick != null)
             {
-                // VirtualJoystick에서 입력 읽기
-                var joystick = joystickObject.GetComponent<VirtualJoystick>();
-                if (joystick != null)
-                {
-                    Vector2 joystickInput = joystick.InputVector;
-                    input = new float2(joystickInput.x, joystickInput.y);
-                }
+                Vector2 joystickInput = _inputReferences.joystick.InputVector;
+                input = new float2(joystickInput.x, joystickInput.y);
             }
 
             // 키보드 입력 (테스트용)
@@ -64,22 +53,49 @@ namespace Meow.ECS.Systems
             if (Input.GetKey(KeyCode.A)) input.x = -1;
             if (Input.GetKey(KeyCode.D)) input.x = 1;
 
-            // ????????????????????????????????????????
-            // ?? 상호작용 버튼 - E키로 변경!
-            // ????????????????????????????????????????
-            interactPressed = Input.GetKeyDown(KeyCode.E);  // Space → E
+            // ========================================
+            // 2. 상호작용 입력 (Tap + Hold)
+            // ========================================
+            bool interactTapped = false;
+            bool interactHoldStarted = false;
+            bool interactHolding = false;
 
-            // 디버그 (E키 누르면 로그)
-            if (interactPressed)
+            // ? ScriptableObject를 통해 접근
+            if (_inputReferences != null && _inputReferences.interactionButton != null)
             {
-                Debug.Log("[PlayerInputSystem] E key pressed!");
+                interactTapped = _inputReferences.interactionButton.WasTappedThisFrame;
+                interactHoldStarted = _inputReferences.interactionButton.WasHoldStartedThisFrame;
+                interactHolding = _inputReferences.interactionButton.IsHolding;
+
+                if (interactTapped)
+                {
+                    Debug.Log("[PlayerInputSystem] TAP detected!");
+                }
+                if (interactHoldStarted)
+                {
+                    Debug.Log("[PlayerInputSystem] HOLD STARTED!");
+                }
             }
 
-            // ECS로 전달
+            // 키보드 입력 (테스트용)
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                interactTapped = true;
+            }
+            if (Input.GetKey(KeyCode.E))
+            {
+                interactHolding = true;
+            }
+
+            // ========================================
+            // 3. ECS로 전달
+            // ========================================
             Entities.ForEach((ref PlayerInputComponent playerInput) =>
             {
                 playerInput.MoveInput = input;
-                playerInput.InteractPressed = interactPressed;
+                playerInput.InteractTapped = interactTapped;
+                playerInput.InteractHoldStarted = interactHoldStarted;
+                playerInput.InteractHolding = interactHolding;
             }).WithoutBurst().Run();
         }
     }

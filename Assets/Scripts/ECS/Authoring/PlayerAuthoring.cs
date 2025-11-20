@@ -37,20 +37,22 @@ namespace Meow.ECS.Authoring
 
             _playerEntity = _entityManager.CreateEntity();
 
-            // Transform
+            var position = transform.position;
+
+            // ? LocalTransform만 추가 (LocalToWorld는 Physics가 자동 생성!)
             _entityManager.AddComponentData(_playerEntity,
-                LocalTransform.FromPosition(transform.position));
+                LocalTransform.FromPosition(position));
 
             // Input
             _entityManager.AddComponentData(_playerEntity, new PlayerInputComponent
             {
                 MoveInput = float2.zero,
-                InteractPressed = false
+                InteractTapped = false,
+                InteractHoldStarted = false,
+                InteractHolding = false
             });
 
-            // ????????????????????????????????????????
-            // ?? PlayerStateComponent 추가!
-            // ????????????????????????????????????????
+            // PlayerStateComponent
             _entityManager.AddComponentData(_playerEntity, new PlayerStateComponent
             {
                 PlayerId = PlayerId,
@@ -86,7 +88,56 @@ namespace Meow.ECS.Authoring
             _entityManager.AddBuffer<PermanentUpgrade>(_playerEntity);
             _entityManager.AddBuffer<TemporaryBuff>(_playerEntity);
 
-            Debug.Log("[PlayerAuthoring] Entity created with all components!");
+            // ========================================
+            // ? Physics 컴포넌트
+            // ========================================
+
+            // PhysicsCollider
+            var playerCollider = Unity.Physics.SphereCollider.Create(
+                new Unity.Physics.SphereGeometry
+                {
+                    Center = float3.zero,
+                    Radius = 0.5f
+                },
+                new Unity.Physics.CollisionFilter
+                {
+                    BelongsTo = 1u << 0,
+                    CollidesWith = 1u << 1,
+                    GroupIndex = 0
+                }
+            );
+
+            _entityManager.AddComponentData(_playerEntity, new Unity.Physics.PhysicsCollider
+            {
+                Value = playerCollider
+            });
+
+            // PhysicsVelocity
+            _entityManager.AddComponentData(_playerEntity, new Unity.Physics.PhysicsVelocity
+            {
+                Linear = float3.zero,
+                Angular = float3.zero
+            });
+
+            // ? PhysicsMass - Kinematic Body (타이쿤 게임에 최적)
+            _entityManager.AddComponentData(_playerEntity, Unity.Physics.PhysicsMass.CreateKinematic(
+                Unity.Physics.MassProperties.UnitSphere
+            ));
+
+            // PhysicsDamping - 관성 제거
+            _entityManager.AddComponentData(_playerEntity, new Unity.Physics.PhysicsDamping
+            {
+                Linear = 10f,
+                Angular = 10f
+            });
+
+            // 중력 끄기
+            _entityManager.AddComponentData(_playerEntity, new Unity.Physics.PhysicsGravityFactor
+            {
+                Value = 0f
+            });
+
+            Debug.Log("[PlayerAuthoring] ? Entity created with Kinematic Physics Body!");
         }
 
         private void LateUpdate()
@@ -100,9 +151,7 @@ namespace Meow.ECS.Authoring
                 quaternion offsetRotation = quaternion.RotateY(_rotationOffsetRadians);
                 transform.rotation = math.mul(lt.Rotation, offsetRotation);
 
-                // ????????????????????????????????????????
-                // ?? 디버그: 플레이어 상태 표시 (옵션)
-                // ????????????????????????????????????????
+                // 디버그: 플레이어 상태 표시 (옵션)
 #if UNITY_EDITOR
                 var playerState = _entityManager.GetComponentData<PlayerStateComponent>(_playerEntity);
                 if (playerState.IsNearStation)
@@ -115,15 +164,29 @@ namespace Meow.ECS.Authoring
 
         private void OnDestroy()
         {
-            if (_entityManager != null && _entityManager.Exists(_playerEntity))
+            if (World.DefaultGameObjectInjectionWorld == null ||
+                !World.DefaultGameObjectInjectionWorld.IsCreated)
+                return;
+
+            var em = World.DefaultGameObjectInjectionWorld.EntityManager;
+
+            if (em.Exists(_playerEntity))
             {
-                _entityManager.DestroyEntity(_playerEntity);
+                // ? 이거 말고는 방법이 없어요
+                if (em.HasComponent<Unity.Physics.PhysicsCollider>(_playerEntity))
+                {
+                    var collider = em.GetComponentData<Unity.Physics.PhysicsCollider>(_playerEntity);
+                    if (collider.Value.IsCreated)
+                    {
+                        collider.Value.Dispose();  // ← 필수!
+                    }
+                }
+
+                em.DestroyEntity(_playerEntity);
             }
         }
 
-        // ????????????????????????????????????????
-        // ?? 기즈모: 플레이어 상태 시각화
-        // ????????????????????????????????????????
+        // 기즈모: 플레이어 상태 시각화
         private void OnDrawGizmos()
         {
             if (Application.isPlaying && _entityManager != null && _entityManager.Exists(_playerEntity))
@@ -158,7 +221,7 @@ namespace Meow.ECS.Authoring
                 if (playerState.IsHoldingItem)
                     info += "\n?? Holding Item";
                 if (playerState.IsNearStation)
-                    info += "\n?? Near Station";
+                    info += "\n? Near Station";
 
                 UnityEditor.Handles.Label(labelPos, info, new GUIStyle()
                 {
