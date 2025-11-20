@@ -162,7 +162,22 @@ namespace Meow.ECS.Authoring
             }
         }
 
+        // 1. OnDisable 메서드 추가 (OnDestroy 위에)
+        private void OnDisable()
+        {
+            // Play Mode 종료 시 메모리 누수 방지를 위해 OnDisable에서 먼저 정리
+            DisposePlayerResources();
+        }
+
+        // 2. OnDestroy를 DisposePlayerResources 호출로 변경
         private void OnDestroy()
+        {
+            // OnDisable에서 이미 정리했지만, 혹시 모를 경우를 대비해 다시 호출
+            DisposePlayerResources();
+        }
+
+        // 3. 실제 정리 로직을 별도 메서드로 분리
+        private void DisposePlayerResources()
         {
             if (World.DefaultGameObjectInjectionWorld == null ||
                 !World.DefaultGameObjectInjectionWorld.IsCreated)
@@ -172,17 +187,18 @@ namespace Meow.ECS.Authoring
 
             if (em.Exists(_playerEntity))
             {
-                // ? 이거 말고는 방법이 없어요
+                // Collider Dispose (메모리 누수 방지)
                 if (em.HasComponent<Unity.Physics.PhysicsCollider>(_playerEntity))
                 {
                     var collider = em.GetComponentData<Unity.Physics.PhysicsCollider>(_playerEntity);
                     if (collider.Value.IsCreated)
                     {
-                        collider.Value.Dispose();  // ← 필수!
+                        collider.Value.Dispose();
                     }
                 }
 
                 em.DestroyEntity(_playerEntity);
+                _playerEntity = Entity.Null;  // 중복 Dispose 방지
             }
         }
 

@@ -36,7 +36,7 @@ namespace Meow.Managers
             }
 
             // VirtualJoystick 찾기
-            var joystick = FindObjectOfType<VirtualJoystick>();
+            var joystick = FindFirstObjectByType<VirtualJoystick>();
             if (joystick != null)
             {
                 inputReferences.joystick = joystick;
@@ -48,7 +48,7 @@ namespace Meow.Managers
             }
 
             // InteractionButton 찾기
-            var button = FindObjectOfType<InteractionButton>();
+            var button = FindFirstObjectByType<InteractionButton>();
             if (button != null)
             {
                 inputReferences.interactionButton = button;

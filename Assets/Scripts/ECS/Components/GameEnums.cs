@@ -43,11 +43,14 @@ namespace Meow.ECS.Components
     public enum StationType
     {
         None = 0,
-        Container = 1,      // 컨테이너 (무한 재료)
-        WorkBench = 2,      // 빈 작업대 (아이템 놓기)
-        Workstation = 3,    // 작업대 (조리, 자르기, 세척)
-        Assembly = 4,       // 조립대 (요리 조합)
-        ServingCounter = 5  // 서빙 카운터
+        Container = 1,        // 컨테이너 (무한 재료)
+        WorkBench = 2,        // 임시 보관 테이블 (여러 아이템)
+        CuttingBoard = 3,     // 도마 (썰기 전용)
+        Stove = 4,            // 가스레인지/오븐 (굽기/조리)
+        Sink = 5,             // 싱크대 (세척)
+        Assembly = 6,         // 조립대 (요리 조합)
+        ServingCounter = 7,   // 서빙 카운터
+        TrashCan = 8          // 쓰레기통 (선택)
     }
 
     /// <summary>

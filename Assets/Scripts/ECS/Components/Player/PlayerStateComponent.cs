@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Mathematics;
 
 namespace Meow.ECS.Components
 {
@@ -25,6 +26,7 @@ namespace Meow.ECS.Components
         /// </summary>
         public bool IsHoldingItem;
 
+
         /// <summary>
         /// 현재 보고 있는/가까운 스테이션
         /// Entity.Null = 근처에 스테이션 없음
@@ -35,5 +37,8 @@ namespace Meow.ECS.Components
         /// 스테이션 근처인가?
         /// </summary>
         public bool IsNearStation;
+
+        // 플레이어 방향 (Raycast용)
+        public float3 LastMoveDirection;  // 마지막 이동 방향
     }
 }

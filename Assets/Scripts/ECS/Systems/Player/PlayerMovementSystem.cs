@@ -10,8 +10,8 @@ using Unity.Physics.Systems;
 namespace Meow.ECS.Systems
 {
     [BurstCompile]
-    [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))] 
-    [UpdateBefore(typeof(PhysicsSystemGroup))] 
+    [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
+    [UpdateBefore(typeof(PhysicsSystemGroup))]
     public partial struct PlayerMovementSystem : ISystem
     {
         [BurstCompile]
@@ -25,8 +25,13 @@ namespace Meow.ECS.Systems
         {
             float deltaTime = SystemAPI.Time.DeltaTime;
 
-            foreach (var (transform, physicsVelocity, input, stats) in
-                SystemAPI.Query<RefRW<LocalTransform>, RefRW<PhysicsVelocity>, RefRO<PlayerInputComponent>, RefRO<PlayerStatsComponent>>())
+            // PlayerStateComponent 추가!
+            foreach (var (transform, physicsVelocity, input, stats, playerState) in
+                SystemAPI.Query<RefRW<LocalTransform>,
+                               RefRW<PhysicsVelocity>,
+                               RefRO<PlayerInputComponent>,
+                               RefRO<PlayerStatsComponent>,
+                               RefRW<PlayerStateComponent>>())  // 추가!
             {
                 float2 moveInput = input.ValueRO.MoveInput;
 
@@ -36,10 +41,13 @@ namespace Meow.ECS.Systems
                     moveDir = math.normalize(moveDir);
                     float finalSpeed = stats.ValueRO.GetFinalMoveSpeed();
 
+                    // 이동 방향 저장 (Raycast용)
+                    playerState.ValueRW.LastMoveDirection = moveDir;
+
                     // Kinematic: Transform 직접 업데이트
                     transform.ValueRW.Position += moveDir * finalSpeed * deltaTime;
 
-                    // Velocity 설정 (충돌 감지용)
+                    // Velocity 설정 (충돌 처리용)
                     physicsVelocity.ValueRW.Linear = moveDir * finalSpeed;
                     physicsVelocity.ValueRW.Angular = float3.zero;
 
@@ -53,6 +61,7 @@ namespace Meow.ECS.Systems
                 }
                 else
                 {
+                    // 정지 중에는 LastMoveDirection 유지 (마지막 방향 기억)
                     physicsVelocity.ValueRW.Linear = float3.zero;
                     physicsVelocity.ValueRW.Angular = float3.zero;
                 }
