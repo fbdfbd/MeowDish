@@ -38,11 +38,17 @@ namespace Meow.ECS.Authoring
             _playerEntity = _entityManager.CreateEntity();
 
             var position = transform.position;
-
-            // ? LocalTransform만 추가 (LocalToWorld는 Physics가 자동 생성!)
+            // ? LocalTransform 추가
             _entityManager.AddComponentData(_playerEntity,
                 LocalTransform.FromPosition(position));
 
+            // ? LocalToWorld 추가 (중요!)
+            _entityManager.AddComponentData(_playerEntity, new LocalToWorld
+            {
+                Value = float4x4.TRS(position, quaternion.identity, new float3(1, 1, 1))
+            });
+            _entityManager.AddComponent<Simulate>(_playerEntity);
+            Debug.Log("[PlayerAuthoring] ? Simulate 태그 추가!");
             // Input
             _entityManager.AddComponentData(_playerEntity, new PlayerInputComponent
             {
@@ -93,6 +99,7 @@ namespace Meow.ECS.Authoring
             // ========================================
 
             // PhysicsCollider
+            // PhysicsCollider
             var playerCollider = Unity.Physics.SphereCollider.Create(
                 new Unity.Physics.SphereGeometry
                 {
@@ -101,11 +108,12 @@ namespace Meow.ECS.Authoring
                 },
                 new Unity.Physics.CollisionFilter
                 {
-                    BelongsTo = 1u << 0,
-                    CollidesWith = 1u << 1,
+                    BelongsTo = 1u << 0,      // Layer 0 (Player)
+                    CollidesWith = ~0u,       // ? 모든 레이어와 충돌 (원래: 1u << 1)
                     GroupIndex = 0
                 }
             );
+
 
             _entityManager.AddComponentData(_playerEntity, new Unity.Physics.PhysicsCollider
             {

@@ -7,9 +7,6 @@ using Meow.ECS.Components;
 
 namespace Meow.ECS.Authoring
 {
-    /// <summary>
-    /// 컨테이너 Authoring (런타임 생성 방식)
-    /// </summary>
     public class ContainerAuthoring : MonoBehaviour
     {
         [Header("컨테이너 설정")]
@@ -23,26 +20,40 @@ namespace Meow.ECS.Authoring
         [Header("상호작용 설정")]
         public float interactionRange = 2.0f;
 
-        [Header("Physics 설정")]
-        public float colliderRadius = 0.5f;
-
         private Entity _containerEntity;
         private EntityManager _entityManager;
 
         private void Start()
         {
-            _entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
+            Debug.Log($"========== ContainerAuthoring Start ==========");
 
-            // 엔티티 생성
+            var world = World.DefaultGameObjectInjectionWorld;
+
+            if (world == null || !world.IsCreated)
+            {
+                Debug.LogError("[Container] ? World 없음!");
+                return;
+            }
+
+            _entityManager = world.EntityManager;
             _containerEntity = _entityManager.CreateEntity();
 
             var position = transform.position;
 
-            // Transform 추가
+            Debug.Log($"[Container] Entity: {_containerEntity}");
+            Debug.Log($"[Container] Position: {position}");
+
+            // 1. LocalTransform
             _entityManager.AddComponentData(_containerEntity,
                 LocalTransform.FromPosition(position));
 
-            // StationComponent 추가
+            // 2. LocalToWorld
+            _entityManager.AddComponentData(_containerEntity, new LocalToWorld
+            {
+                Value = float4x4.TRS(position, quaternion.identity, new float3(1))
+            });
+
+            // 3-5. Game Components
             _entityManager.AddComponentData(_containerEntity, new StationComponent
             {
                 Type = StationType.Container,
@@ -50,7 +61,6 @@ namespace Meow.ECS.Authoring
                 PlacedItemEntity = Entity.Null
             });
 
-            // ContainerComponent 추가
             _entityManager.AddComponentData(_containerEntity, new ContainerComponent
             {
                 ProvidedIngredient = providedIngredient,
@@ -58,25 +68,24 @@ namespace Meow.ECS.Authoring
                 IsInfinite = isInfinite
             });
 
-            // InteractableComponent 추가
             _entityManager.AddComponentData(_containerEntity, new InteractableComponent
             {
                 IsActive = true,
                 InteractionRange = interactionRange
             });
 
-            // Physics Collider 추가
+            // 6. PhysicsCollider
             var collider = Unity.Physics.BoxCollider.Create(
                 new Unity.Physics.BoxGeometry
                 {
                     Center = float3.zero,
                     Orientation = quaternion.identity,
-                    Size = new float3(1f, 1f, 1f),
+                    Size = new float3(1.5f, 2f, 1.5f),
                     BevelRadius = 0.05f
                 },
                 new Unity.Physics.CollisionFilter
                 {
-                    BelongsTo = 1u << 6,  // Layer 6 = Station
+                    BelongsTo = 1u << 6,
                     CollidesWith = ~0u,
                     GroupIndex = 0
                 }
@@ -87,12 +96,31 @@ namespace Meow.ECS.Authoring
                 Value = collider
             });
 
-            Debug.Log($"[ContainerAuthoring] 컨테이너 엔티티 생성 완료! ID: {stationID}, 재료: {providedIngredient}");
+            // 7. PhysicsVelocity
+            _entityManager.AddComponentData(_containerEntity, new PhysicsVelocity
+            {
+                Linear = float3.zero,
+                Angular = float3.zero
+            });
+
+            // 8. PhysicsMass
+            _entityManager.AddComponentData(_containerEntity,
+                PhysicsMass.CreateKinematic(MassProperties.UnitSphere));
+
+            // ??? 9. Simulate!
+            _entityManager.AddComponent<Simulate>(_containerEntity);
+            Debug.Log("[Container] ? Simulate");
+
+            // ??? 10. PhysicsWorldIndex! (최종 해결!)
+            _entityManager.AddSharedComponent(_containerEntity, new PhysicsWorldIndex(0));
+            Debug.Log("[Container] ??? PhysicsWorldIndex");
+
+            Debug.Log($"========== Container 완료 ==========");
         }
+
 
         private void LateUpdate()
         {
-            // GameObject 위치 동기화 (움직일 일은 없지만 일관성 위해)
             if (_entityManager.Exists(_containerEntity))
             {
                 var lt = _entityManager.GetComponentData<LocalTransform>(_containerEntity);
@@ -110,7 +138,6 @@ namespace Meow.ECS.Authoring
 
             if (em.Exists(_containerEntity))
             {
-                // Physics Collider Dispose
                 if (em.HasComponent<PhysicsCollider>(_containerEntity))
                 {
                     var collider = em.GetComponentData<PhysicsCollider>(_containerEntity);
@@ -126,43 +153,11 @@ namespace Meow.ECS.Authoring
 
         private void OnDrawGizmosSelected()
         {
-            // 상호작용 범위
             Gizmos.color = Color.green;
-            Gizmos.DrawWireSphere(transform.position, interactionRange);
+            Gizmos.DrawWireSphere(transform.position, 2.0f);
 
-            // 컨테이너 박스
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawWireCube(transform.position + Vector3.up * 0.5f, Vector3.one);
-
-            // Collider 범위
             Gizmos.color = Color.red;
-            Gizmos.DrawWireCube(transform.position, Vector3.one);
+            Gizmos.DrawWireCube(transform.position, new Vector3(1.5f, 2f, 1.5f));
         }
-
-#if UNITY_EDITOR
-        private void OnDrawGizmos()
-        {
-            if (Application.isPlaying && _entityManager != null && _entityManager.Exists(_containerEntity))
-            {
-                var station = _entityManager.GetComponentData<StationComponent>(_containerEntity);
-                var container = _entityManager.GetComponentData<ContainerComponent>(_containerEntity);
-
-                // 라벨 표시
-                Vector3 labelPos = transform.position + Vector3.up * 2f;
-                string info = $"Container\n{container.ProvidedIngredient}";
-
-                if (station.HasItem)
-                    info += "\n[아이템 있음]";
-
-                UnityEditor.Handles.Label(labelPos, info, new GUIStyle()
-                {
-                    alignment = TextAnchor.MiddleCenter,
-                    normal = new GUIStyleState() { textColor = Color.cyan },
-                    fontSize = 11,
-                    fontStyle = FontStyle.Bold
-                });
-            }
-        }
-#endif
     }
 }

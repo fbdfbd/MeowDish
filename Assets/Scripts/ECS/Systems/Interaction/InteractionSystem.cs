@@ -8,7 +8,7 @@ namespace Meow.ECS.Systems
     /// 상호작용 입력 처리 시스템
     /// 
     /// 역할:
-    /// 1. E키 또는 상호작용 버튼 입력 감지
+    /// 1. PlayerInputComponent.InteractTapped 감지
     /// 2. PlayerState.CurrentStationEntity 확인
     /// 3. InteractionRequestComponent 생성
     /// 
@@ -27,18 +27,16 @@ namespace Meow.ECS.Systems
 
         protected override void OnUpdate()
         {
-            // E키 입력 체크 (TODO: InputSystem에서 처리)
-            bool interactPressed = Input.GetKeyDown(KeyCode.E);
-
-            if (!interactPressed) return;
-
             var ecb = _ecbSystem.CreateCommandBuffer();
-
-            // 플레이어 찾기
-            foreach (var (playerState, playerEntity) in
-                     SystemAPI.Query<RefRO<PlayerStateComponent>>()
+            Debug.Log($"[InteractionSystem] 실행중。。。");
+            // 플레이어 찾기 (입력 + 상태 둘 다 필요)
+            foreach (var (playerInput, playerState, playerEntity) in
+                     SystemAPI.Query<RefRO<PlayerInputComponent>, RefRO<PlayerStateComponent>>()
                      .WithEntityAccess())
             {
+                // 상호작용 입력이 없으면 무시
+                if (!playerInput.ValueRO.InteractTapped) continue;
+
                 // 스테이션 근처가 아니면 무시
                 if (!playerState.ValueRO.IsNearStation) continue;
 
