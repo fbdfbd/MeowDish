@@ -1,227 +1,244 @@
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using Unity.Physics;
 using UnityEngine;
 using Meow.ECS.Components;
+using Meow.ECS.View;
+using Meow.Data;
 
 namespace Meow.ECS.Authoring
 {
     public class PlayerAuthoring : MonoBehaviour
     {
-        [Header("기본 스탯")]
-        public float BaseMoveSpeed = 5.0f;
-        public float BaseActionSpeed = 1.0f;
+        // =========================================================
+        // 1. 인스펙터 설정
+        // =========================================================
+        [Header("데이터 에셋 연결")]
+        [Tooltip("플레이어 스탯이 담긴 ScriptableObject")]
+        public PlayerStatsSO StatsData;
 
-        [Header("회전 설정")]
-        [Tooltip("캐릭터 회전 속도 (값이 클수록 빠르게 회전)")]
-        [Range(5f, 20f)]
-        public float RotationSpeed = 10f;
-
-        [Header("캐릭터 모델 설정")]
+        [Header("개별 설정")]
         [Tooltip("캐릭터 모델의 Forward 방향 보정 (Y축 회전)")]
         [Range(-180f, 180f)]
         public float ModelRotationOffset = 0f;
 
         [Header("플레이어 ID")]
-        [Tooltip("멀티플레이어용 ID (싱글은 0)")]
         public int PlayerId = 0;
 
+        [Header("물리 설정")]
+        [Tooltip("플레이어 충돌 반경 (기본 0.5 -> 뚱뚱하면 0.3으로 줄이세요)")]
+        public float playerRadius = 0.5f; // ?? 여기서 조절 가능!
+
+        // =========================================================
+        // 2. 내부 변수
+        // =========================================================
         private Entity _playerEntity;
         private EntityManager _entityManager;
         private float _rotationOffsetRadians;
+        private BlobAssetReference<PlayerBaseStats> _statsBlobRef;
 
+        // =========================================================
+        // 3. 초기화 (목차)
+        // =========================================================
         private void Start()
+        {
+            // 안전장치
+            if (StatsData == null)
+            {
+                Debug.LogError($"[{name}] PlayerStatsSO가 연결되지 않았습니다! StatsData에 에셋을 넣어주세요.");
+                return;
+            }
+
+            InitializeEntityManager();
+            CreatePlayerEntity();
+
+            SetupTransform();
+            SetupStatsAndConfig();
+            SetupGameLogicComponents();
+            SetupPhysics();
+
+            ConnectToView();
+        }
+
+        // =========================================================
+        // 4. 세부 설정 메서드들
+        // =========================================================
+
+        private void InitializeEntityManager()
         {
             _entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
             _rotationOffsetRadians = math.radians(ModelRotationOffset);
+        }
 
+        private void CreatePlayerEntity()
+        {
             _playerEntity = _entityManager.CreateEntity();
+            _entityManager.AddComponentData(_playerEntity, new PlayerTag { });
 
+#if UNITY_EDITOR
+            _entityManager.SetName(_playerEntity, $"Player_{PlayerId}");
+#endif
+        }
+
+        private void SetupTransform()
+        {
             var position = transform.position;
-            // ? LocalTransform 추가
-            _entityManager.AddComponentData(_playerEntity,
-                LocalTransform.FromPosition(position));
-
-            // ? LocalToWorld 추가 (중요!)
+            _entityManager.AddComponentData(_playerEntity, LocalTransform.FromPosition(position));
             _entityManager.AddComponentData(_playerEntity, new LocalToWorld
             {
                 Value = float4x4.TRS(position, quaternion.identity, new float3(1, 1, 1))
             });
             _entityManager.AddComponent<Simulate>(_playerEntity);
-            Debug.Log("[PlayerAuthoring] ? Simulate 태그 추가!");
-            // Input
-            _entityManager.AddComponentData(_playerEntity, new PlayerInputComponent
+        }
+
+        private void SetupStatsAndConfig()
+        {
+            // 1. 불변 데이터 (Blob) 생성 - SO에서 값 읽어오기
+            using (var builder = new BlobBuilder(Allocator.Temp))
             {
-                MoveInput = float2.zero,
-                InteractTapped = false,
-                InteractHoldStarted = false,
-                InteractHolding = false
+                ref PlayerBaseStats rootStats = ref builder.ConstructRoot<PlayerBaseStats>();
+
+                // SO의 데이터를 Blob에 주입
+                rootStats.BaseMoveSpeed = StatsData.BaseMoveSpeed;
+                rootStats.BaseActionSpeed = StatsData.BaseActionSpeed;
+                rootStats.RotationSpeed = StatsData.RotationSpeed;
+
+                _statsBlobRef = builder.CreateBlobAssetReference<PlayerBaseStats>(Allocator.Persistent);
+            }
+
+            // 2. Config 연결
+            _entityManager.AddComponentData(_playerEntity, new UnitConfig
+            {
+                BlobRef = _statsBlobRef
             });
 
-            // PlayerStateComponent
-            _entityManager.AddComponentData(_playerEntity, new PlayerStateComponent
-            {
-                PlayerId = PlayerId,
-                HeldItemEntity = Entity.Null,
-                IsHoldingItem = false,
-                CurrentStationEntity = Entity.Null,
-                IsNearStation = false
-            });
-
-            // Stats
+            // 3. 가변 데이터 (Stats) 생성
             _entityManager.AddComponentData(_playerEntity, new PlayerStatsComponent
             {
-                BaseMoveSpeed = BaseMoveSpeed,
-                BaseActionSpeed = BaseActionSpeed,
-                RotationSpeed = RotationSpeed,
-                MoveSpeedBonus = 0,
-                ActionSpeedBonus = 0,
+                MoveSpeedBonus = 0f,
+                ActionSpeedBonus = 0f,
                 MoveSpeedMultiplier = 1.0f,
                 ActionSpeedMultiplier = 1.0f,
                 AllSpeedMultiplier = 1.0f
             });
+        }
 
-            // Animation
-            _entityManager.AddComponentData(_playerEntity, new PlayerAnimationComponent
+        private void SetupGameLogicComponents()
+        {
+            // Input
+            _entityManager.AddComponentData(_playerEntity, new PlayerInputComponent());
+
+            // State
+            _entityManager.AddComponentData(_playerEntity, new PlayerStateComponent
             {
-                IsMoving = false
+                PlayerId = PlayerId,
+                HeldItemEntity = Entity.Null,
+                CurrentStationEntity = Entity.Null,
+                LastMoveDirection = math.forward()
             });
 
-            // Equipment
-            _entityManager.AddComponentData(_playerEntity, new EquipmentSlots());
+            // Animation (데이터)
+            _entityManager.AddComponentData(_playerEntity, new PlayerAnimationComponent());
+        }
 
-            // Buffers
-            _entityManager.AddBuffer<PermanentUpgrade>(_playerEntity);
-            _entityManager.AddBuffer<TemporaryBuff>(_playerEntity);
+        private void ConnectToView()
+        {
+            var animView = GetComponent<PlayerAnimationView>();
+            if (animView != null)
+            {
+                animView.Initialize(_playerEntity, _entityManager);
+            }
+            else
+            {
+                Debug.LogWarning($"[{name}] PlayerAnimationView가 없습니다! 애니메이션이 작동하지 않습니다.");
+            }
+        }
 
-            // ========================================
-            // ? Physics 컴포넌트
-            // ========================================
-
-            // PhysicsCollider
-            // PhysicsCollider
+        private void SetupPhysics()
+        {
+            // ?? [핵심 수정] playerRadius 변수를 사용해서 콜라이더 생성
             var playerCollider = Unity.Physics.SphereCollider.Create(
                 new Unity.Physics.SphereGeometry
                 {
-                    Center = float3.zero,
-                    Radius = 0.5f
+                    Center = new float3(0,0,0),
+                    Radius = playerRadius // <--- 변수 사용!
                 },
                 new Unity.Physics.CollisionFilter
                 {
-                    BelongsTo = 1u << 0,      // Layer 0 (Player)
-                    CollidesWith = ~0u,       // ? 모든 레이어와 충돌 (원래: 1u << 1)
+                    BelongsTo = 1u << 0,
+                    CollidesWith = ~0u,
                     GroupIndex = 0
                 }
             );
 
-
-            _entityManager.AddComponentData(_playerEntity, new Unity.Physics.PhysicsCollider
-            {
-                Value = playerCollider
-            });
-
-            // PhysicsVelocity
-            _entityManager.AddComponentData(_playerEntity, new Unity.Physics.PhysicsVelocity
-            {
-                Linear = float3.zero,
-                Angular = float3.zero
-            });
-
-            // ? PhysicsMass - Kinematic Body (타이쿤 게임에 최적)
-            _entityManager.AddComponentData(_playerEntity, Unity.Physics.PhysicsMass.CreateKinematic(
-                Unity.Physics.MassProperties.UnitSphere
-            ));
-
-            // PhysicsDamping - 관성 제거
-            _entityManager.AddComponentData(_playerEntity, new Unity.Physics.PhysicsDamping
-            {
-                Linear = 10f,
-                Angular = 10f
-            });
-
-            // 중력 끄기
-            _entityManager.AddComponentData(_playerEntity, new Unity.Physics.PhysicsGravityFactor
-            {
-                Value = 0f
-            });
-
-            Debug.Log("[PlayerAuthoring] ? Entity created with Kinematic Physics Body!");
+            _entityManager.AddComponentData(_playerEntity, new PhysicsCollider { Value = playerCollider });
+            _entityManager.AddComponentData(_playerEntity, new PhysicsVelocity());
+            _entityManager.AddComponentData(_playerEntity, PhysicsMass.CreateKinematic(MassProperties.UnitSphere));
+            _entityManager.AddComponentData(_playerEntity, new PhysicsDamping { Linear = 10f, Angular = 10f });
+            _entityManager.AddComponentData(_playerEntity, new PhysicsGravityFactor { Value = 0f });
         }
+
+        // =========================================================
+        // 5. 업데이트 및 해제
+        // =========================================================
 
         private void LateUpdate()
         {
+            // 엔티티의 위치/회전을 GameObject에 동기화
             if (_entityManager.Exists(_playerEntity))
             {
                 var lt = _entityManager.GetComponentData<LocalTransform>(_playerEntity);
                 transform.position = lt.Position;
 
-                // 회전 오프셋 적용
                 quaternion offsetRotation = quaternion.RotateY(_rotationOffsetRadians);
                 transform.rotation = math.mul(lt.Rotation, offsetRotation);
-
-                // 디버그: 플레이어 상태 표시 (옵션)
-#if UNITY_EDITOR
-                var playerState = _entityManager.GetComponentData<PlayerStateComponent>(_playerEntity);
-                if (playerState.IsNearStation)
-                {
-                    Debug.DrawLine(transform.position, transform.position + Vector3.up * 2f, Color.yellow);
-                }
-#endif
             }
         }
 
-        // 1. OnDisable 메서드 추가 (OnDestroy 위에)
-        private void OnDisable()
-        {
-            // Play Mode 종료 시 메모리 누수 방지를 위해 OnDisable에서 먼저 정리
-            DisposePlayerResources();
-        }
+        private void OnDisable() => DisposePlayerResources();
+        private void OnDestroy() => DisposePlayerResources();
 
-        // 2. OnDestroy를 DisposePlayerResources 호출로 변경
-        private void OnDestroy()
-        {
-            // OnDisable에서 이미 정리했지만, 혹시 모를 경우를 대비해 다시 호출
-            DisposePlayerResources();
-        }
-
-        // 3. 실제 정리 로직을 별도 메서드로 분리
         private void DisposePlayerResources()
         {
-            if (World.DefaultGameObjectInjectionWorld == null ||
-                !World.DefaultGameObjectInjectionWorld.IsCreated)
-                return;
-
+            if (World.DefaultGameObjectInjectionWorld == null || !World.DefaultGameObjectInjectionWorld.IsCreated) return;
             var em = World.DefaultGameObjectInjectionWorld.EntityManager;
 
+            // Blob 수동 해제
+            if (_statsBlobRef.IsCreated) _statsBlobRef.Dispose();
+
+            // 엔티티 및 Collider 해제
             if (em.Exists(_playerEntity))
             {
-                // Collider Dispose (메모리 누수 방지)
-                if (em.HasComponent<Unity.Physics.PhysicsCollider>(_playerEntity))
+                if (em.HasComponent<PhysicsCollider>(_playerEntity))
                 {
-                    var collider = em.GetComponentData<Unity.Physics.PhysicsCollider>(_playerEntity);
-                    if (collider.Value.IsCreated)
-                    {
-                        collider.Value.Dispose();
-                    }
+                    var collider = em.GetComponentData<PhysicsCollider>(_playerEntity);
+                    if (collider.Value.IsCreated) collider.Value.Dispose();
                 }
-
                 em.DestroyEntity(_playerEntity);
-                _playerEntity = Entity.Null;  // 중복 Dispose 방지
+                _playerEntity = Entity.Null;
             }
         }
 
-        // 기즈모: 플레이어 상태 시각화
+        // =========================================================
+        // 6. 디버그 (Gizmos)
+        // =========================================================
         private void OnDrawGizmos()
         {
+            if (this == null || gameObject == null) return;
+
+            // 실행 중이고 엔티티가 살아있을 때
             if (Application.isPlaying && _entityManager != null && _entityManager.Exists(_playerEntity))
             {
                 var playerState = _entityManager.GetComponentData<PlayerStateComponent>(_playerEntity);
 
-                // 플레이어 위치
+                // 1. 플레이어 위치
                 Gizmos.color = Color.blue;
-                Gizmos.DrawWireSphere(transform.position, 0.5f);
+                // ?? 기즈모도 실제 반경으로 그리기
+                Gizmos.DrawWireSphere(transform.position, playerRadius);
 
-                // 들고 있는 아이템 표시
+                // 2. 들고 있는 아이템 표시
                 if (playerState.IsHoldingItem)
                 {
                     Gizmos.color = Color.green;
@@ -229,7 +246,7 @@ namespace Meow.ECS.Authoring
                     Gizmos.DrawCube(itemPos, Vector3.one * 0.3f);
                 }
 
-                // 근처 스테이션 연결선
+                // 3. 근처 스테이션 연결선
                 if (playerState.IsNearStation && _entityManager.Exists(playerState.CurrentStationEntity))
                 {
                     var stationTransform = _entityManager.GetComponentData<LocalTransform>(playerState.CurrentStationEntity);
@@ -238,36 +255,35 @@ namespace Meow.ECS.Authoring
                 }
 
 #if UNITY_EDITOR
-                // 상태 텍스트
+                // 4. 상태 텍스트
                 Vector3 labelPos = transform.position + Vector3.up * 2.5f;
                 string info = $"Player {PlayerId}";
 
                 if (playerState.IsHoldingItem)
                     info += "\n?? Holding Item";
                 if (playerState.IsNearStation)
-                    info += "\n? Near Station";
+                    info += "\n?? Near Station";
 
                 UnityEditor.Handles.Label(labelPos, info, new GUIStyle()
                 {
                     alignment = TextAnchor.MiddleCenter,
                     normal = new GUIStyleState() { textColor = Color.cyan },
-                    fontSize = 11,
+                    fontSize = 12,
                     fontStyle = FontStyle.Bold
                 });
 #endif
+            }
+            else
+            {
+                // 플레이 전 에디터 상태일 때
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawWireSphere(transform.position, playerRadius);
             }
         }
 
         private void OnDrawGizmosSelected()
         {
-            // 선택했을 때 추가 정보
-            if (Application.isPlaying && _entityManager != null && _entityManager.Exists(_playerEntity))
-            {
-                var stats = _entityManager.GetComponentData<PlayerStatsComponent>(_playerEntity);
-
-                // 이동속도 시각화
-                Gizmos.color = new Color(0, 1, 0, 0.3f);
-            }
+            // 필요시 추가
         }
     }
 }

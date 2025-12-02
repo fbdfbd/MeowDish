@@ -7,10 +7,11 @@ namespace Meow.ECS.Components
     /// </summary>
     public enum BuffType
     {
-        MoveSpeed = 0,
-        ActionSpeed = 1,
-        AllSpeed = 2,
-        // TODO: 나중에 추가
+        None = 0,
+        SpeedUp = 1,
+        FastCooking = 2,
+        RichCustomer = 3,
+        InfinitePatience = 4
     }
 
     /// <summary>
