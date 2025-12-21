@@ -11,19 +11,19 @@ namespace Meow.ECS.Components
         /// <summary>현재 이 카운터에 줄 서 있는 손님 수</summary>
         public int CurrentQueueCount;
 
-        /// <summary>최대 대기 가능 인원 (예: 3명이면 꽉 차서 다른 줄로 감)</summary>
+        /// <summary>최대 대기 가능 인원(꽉차면 다른줄. 다른줄도 차면 안섬)</summary>
         public int MaxQueueCapacity;
 
-        /// <summary>지금 주문 받고 있는 손님 (맨 앞)</summary>
+        /// <summary>맨앞(주문중) 손님</summary>
         public Entity CurrentCustomer;
     }
 
     /// <summary>
-    /// 손님들이 줄 서는 위치 정보
+    /// 손님 줄 서는 위치 정보
     /// </summary>
     public struct ServingQueuePoint : IComponentData
     {
-        public float3 StartLocalPosition; // 첫 번째 손님 위치 (로컬)
-        public float QueueInterval;       // 뒷사람 간격 (미터)
+        public float3 StartLocalPosition;
+        public float QueueInterval; 
     }
 }

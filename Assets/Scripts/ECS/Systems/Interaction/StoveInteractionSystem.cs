@@ -1,135 +1,138 @@
+Ôªøusing Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
-using Unity.Transforms;
 using Unity.Mathematics;
-using UnityEngine;
+using Unity.Transforms;
 using Meow.ECS.Components;
+using Meow.ECS.Utils;
 
 namespace Meow.ECS.Systems
 {
+    [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateAfter(typeof(InteractionSystem))]
-    public partial class StoveInteractionSystem : SystemBase
+    public partial struct StoveInteractionSystem : ISystem
     {
-        private EndSimulationEntityCommandBufferSystem _ecbSystem;
+        [BurstCompile] public void OnCreate(ref SystemState state) { }
 
-        protected override void OnCreate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            base.OnCreate();
-            _ecbSystem = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
-        }
+            if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause) && pause.IsPaused) return;
 
-        protected override void OnUpdate()
-        {
-            var ecb = _ecbSystem.CreateCommandBuffer();
+            var ecb = new EntityCommandBuffer(Allocator.Temp);
 
-            // "Ω∫≈‰∫Í ø‰√ª ≈¬±◊(StoveRequestTag)"∞° ∫Ÿ¿∫ «√∑π¿ÃæÓ∏∏ « ≈Õ∏µ
-            foreach (var (request, playerState, playerTransform, entity) in
+            foreach (var (request, playerStateRW, playerTransform, entity) in
                      SystemAPI.Query<RefRO<InteractionRequestComponent>, RefRW<PlayerStateComponent>, RefRO<LocalTransform>>()
-                         .WithAll<StoveRequestTag>()
-                         .WithEntityAccess())
+                              .WithAll<StoveRequestTag>()
+                              .WithEntityAccess())
             {
                 Entity stoveEntity = request.ValueRO.TargetStation;
 
-                var stoveData = SystemAPI.GetComponent<StoveComponent>(stoveEntity);
                 var stoveState = SystemAPI.GetComponentRW<StoveCookingState>(stoveEntity);
                 var stoveSnap = SystemAPI.GetComponent<StoveSnapPoint>(stoveEntity);
                 var stoveTransform = SystemAPI.GetComponent<LocalTransform>(stoveEntity);
 
-                Debug.Log("========================================");
-
-                // ============================================================
-                // CASE 1: «√∑π¿ÃæÓ -> Ω∫≈‰∫Í (ø√∏Æ±‚)
-                // ============================================================
-                if (playerState.ValueRO.IsHoldingItem)
+                // CASE 1: ÌîåÎ†àÏù¥Ïñ¥ -> Ïä§ÌÜ†Î∏å (Ïò¨Î¶¨Í∏∞)
+                if (playerStateRW.ValueRO.IsHoldingItem)
                 {
-                    // 1. Ω∫≈‰∫Í∞° ¿ÃπÃ ªÁøÎ ¡ﬂ¿Œ∞°?
-                    if (stoveState.ValueRO.ItemEntity != Entity.Null)
-                    {
-                        Debug.LogWarning("[Ω«∆–] Ω∫≈‰∫Í∞° ¿ÃπÃ ªÁøÎ ¡ﬂ¿‘¥œ¥Ÿ!");
-                    }
-                    else
-                    {
-                        Entity heldItem = playerState.ValueRO.HeldItemEntity;
-
-                        // 2. ?? [∞ÀªÁ] ±∏øÔ ºˆ ¿÷¥¬ æ∆¿Ã≈€¿Œ∞°? (CookableComponent √º≈©)
-                        if (SystemAPI.HasComponent<CookableComponent>(heldItem))
-                        {
-                            // Ω∫≈‰∫Í ªÛ≈¬ ∞ªΩ≈ (ø√∏Æ±‚)
-                            stoveState.ValueRW.ItemEntity = heldItem;
-                            stoveState.ValueRW.CurrentCookProgress = 0f;
-                            stoveState.ValueRW.IsCooking = true; // ø‰∏Æ Ω√¿€!
-
-                            // ¿ßƒ° ¿Ãµø (Ω∫≥¿ ∆˜¿Œ∆Æ)
-                            float3 worldPos = stoveTransform.Position + math.rotate(stoveTransform.Rotation, stoveSnap.LocalPosition);
-
-                            ecb.SetComponent(heldItem, new LocalTransform
-                            {
-                                Position = worldPos,
-                                Rotation = quaternion.identity,
-                                Scale = 1f
-                            });
-
-                            // º“¿Ø±« ¿Ã¿¸ («√∑π¿ÃæÓ -> Ω∫≈‰∫Í)
-                            ecb.SetComponent(heldItem, new HoldableComponent { HolderEntity = stoveEntity });
-
-                            // «√∑π¿ÃæÓ º’ ∫ÒøÏ±‚
-                            playerState.ValueRW.IsHoldingItem = false;
-                            playerState.ValueRW.HeldItemEntity = Entity.Null;
-
-                            Debug.Log($"[º∫∞¯] Ω∫≈‰∫Íø° æ∆¿Ã≈€¿ª ø√∑»Ω¿¥œ¥Ÿ. ¡∂∏Æ Ω√¿€!");
-                        }
-                        else
-                        {
-                            Debug.LogWarning("[Ω«∆–] ¿Ã æ∆¿Ã≈€¿∫ ±∏øÔ ºˆ æ¯Ω¿¥œ¥Ÿ!");
-                        }
-                    }
-                }
-                // ============================================================
-                // CASE 2: Ω∫≈‰∫Í -> «√∑π¿ÃæÓ (≤®≥ª±‚)
-                // ============================================================
-                else
-                {
-                    // Ω∫≈‰∫Í∞° ∫Òæ˙¥¬¡ˆ »Æ¿Œ
                     if (stoveState.ValueRO.ItemEntity == Entity.Null)
                     {
-                        Debug.LogWarning("[Ω«∆–] Ω∫≈‰∫Í∞° ∫ÒæÓ¿÷Ω¿¥œ¥Ÿ!");
+                        Entity heldItem = playerStateRW.ValueRO.HeldItemEntity;
+
+                        if (SystemAPI.HasComponent<CookableComponent>(heldItem))
+                        {
+                            float startProgress = 0f;
+                            if (SystemAPI.HasComponent<CookingState>(heldItem))
+                                startProgress = SystemAPI.GetComponent<CookingState>(heldItem).Elapsed;
+                            else
+                                ecb.AddComponent(heldItem, new CookingState { Elapsed = 0f });
+
+                            stoveState.ValueRW.ItemEntity = heldItem;
+                            stoveState.ValueRW.CurrentCookProgress = startProgress;
+                            stoveState.ValueRW.IsCooking = true;
+
+                            float3 worldPos = stoveTransform.Position + math.rotate(stoveTransform.Rotation, stoveSnap.LocalPosition);
+
+                            var stateCopy = playerStateRW.ValueRO;
+                            InteractionHelper.DetachItemFromPlayer(
+                                ref ecb,
+                                entity,
+                                ref stateCopy,
+                                heldItem,
+                                stoveEntity,
+                                worldPos,
+                                itemHasLocalTransform: true,
+                                itemHasHoldable: true
+                            );
+                            playerStateRW.ValueRW = stateCopy;
+
+                            var fxBuffer = EnsureFxBuffer(stoveEntity, ref ecb, ref state);
+                            fxBuffer.Add(new StoveFxEvent
+                            {
+                                Event = StoveFxEvent.Kind.StartCook,
+                                WorldPos = worldPos,
+                                Rot = stoveTransform.Rotation,
+                                Item = heldItem
+                            });
+                        }
                     }
-                    else
+                }
+                // CASE 2: Ïä§ÌÜ†Î∏å -> ÌîåÎ†àÏù¥Ïñ¥ (Í∫ºÎÇ¥Í∏∞)
+                else
+                {
+                    if (stoveState.ValueRO.ItemEntity != Entity.Null)
                     {
                         Entity targetItem = stoveState.ValueRO.ItemEntity;
+                        float carriedProgress = stoveState.ValueRO.CurrentCookProgress;
 
-                        // Ω∫≈‰∫Í ªÛ≈¬ ∞ªΩ≈ (∫ÒøÏ±‚)
+                        // ÏßÑÌñâÎèÑ ÏïÑÏù¥ÌÖúÏóê Í∏∞Î°ù
+                        if (SystemAPI.HasComponent<CookingState>(targetItem))
+                            ecb.SetComponent(targetItem, new CookingState { Elapsed = carriedProgress });
+                        else
+                            ecb.AddComponent(targetItem, new CookingState { Elapsed = carriedProgress });
+
                         stoveState.ValueRW.ItemEntity = Entity.Null;
-                        stoveState.ValueRW.IsCooking = false; // ø‰∏Æ ¡ﬂ¥‹
+                        stoveState.ValueRW.IsCooking = false;
                         stoveState.ValueRW.CurrentCookProgress = 0f;
 
-                        // ¿ßƒ° ¿Ãµø («√∑π¿ÃæÓ º’)
-                        float3 handPos = playerTransform.ValueRO.Position + new float3(0, 1.5f, 0.5f);
+                        var stateCopy = playerStateRW.ValueRO;
+                        InteractionHelper.AttachItemToPlayer(
+                            ref ecb,
+                            entity,
+                            ref stateCopy,
+                            playerTransform.ValueRO.Position,
+                            playerTransform.ValueRO.Rotation,
+                            targetItem,
+                            itemHasLocalTransform: true,
+                            itemHasHoldable: true
+                        );
+                        playerStateRW.ValueRW = stateCopy;
 
-                        ecb.SetComponent(targetItem, new LocalTransform
+                        float3 worldPos = stoveTransform.Position + math.rotate(stoveTransform.Rotation, stoveSnap.LocalPosition);
+                        var fxBuffer = EnsureFxBuffer(stoveEntity, ref ecb, ref state);
+                        fxBuffer.Add(new StoveFxEvent
                         {
-                            Position = handPos,
-                            Rotation = quaternion.identity,
-                            Scale = 1f
+                            Event = StoveFxEvent.Kind.StopCook,
+                            WorldPos = worldPos,
+                            Rot = stoveTransform.Rotation,
+                            Item = targetItem
                         });
-
-                        // º“¿Ø±« ¿Ã¿¸ (Ω∫≈‰∫Í -> «√∑π¿ÃæÓ)
-                        ecb.SetComponent(targetItem, new HoldableComponent { HolderEntity = entity });
-
-                        // «√∑π¿ÃæÓ º’ √§øÏ±‚
-                        playerState.ValueRW.IsHoldingItem = true;
-                        playerState.ValueRW.HeldItemEntity = targetItem;
-
-                        Debug.Log($"[º∫∞¯] Ω∫≈‰∫Íø°º≠ æ∆¿Ã≈€¿ª ≤®≥¬Ω¿¥œ¥Ÿ.");
                     }
                 }
 
-                Debug.Log("========================================");
-
-                // √≥∏Æ øœ∑· (∆˜Ω∫∆Æ¿’ ∂º±‚)
-                ecb.RemoveComponent<InteractionRequestComponent>(entity);
-                ecb.RemoveComponent<StoveRequestTag>(entity);
+                InteractionHelper.EndRequest<StoveRequestTag>(ref ecb, entity);
             }
+
+            ecb.Playback(state.EntityManager);
+            ecb.Dispose();
+        }
+
+        private static DynamicBuffer<StoveFxEvent> EnsureFxBuffer(Entity stoveEntity, ref EntityCommandBuffer ecb, ref SystemState state)
+        {
+            if (state.EntityManager.HasBuffer<StoveFxEvent>(stoveEntity))
+                return state.EntityManager.GetBuffer<StoveFxEvent>(stoveEntity);
+            return ecb.AddBuffer<StoveFxEvent>(stoveEntity);
         }
     }
 }

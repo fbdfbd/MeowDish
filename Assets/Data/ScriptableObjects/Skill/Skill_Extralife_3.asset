@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bde7cd7e64c73944ca9957400273fc68, type: 3}
+  m_Name: Skill_Extralife_3
+  m_EditorClassIdentifier: 
+  skillRank: 2
+  skillId: extralife_3
+  displayName: "\uC608\uBE44 \uC0DD\uBA85 \uCD94\uAC00"
+  description: "\uC0DD\uBA85 \uCD5C\uB300\uCE58\uAC00 \uC99D\uAC00\uD569\uB2C8\uB2E4."
+  positiveText: "\uC0DD\uBA85 +3"
+  negativeText: "\uC190\uB2D8 \uC99D\uAC00 10\uBA85"
+  icon: {fileID: 21300000, guid: 6175f35c71ac1cd4796170f6a242bc34, type: 3}
+  buffType: 5
+  valueOp: 0
+  multiplier: 0
+  flatValue: 3
+  duration: 0
+  isPermanent: 0
+  stackPolicy: 1
+  additionalCustomers: 10

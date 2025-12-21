@@ -1,159 +1,114 @@
+ï»¿using Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
-using Unity.Transforms;
 using Unity.Mathematics;
-using UnityEngine;
+using Unity.Transforms;
 using Meow.ECS.Components;
+using Meow.ECS.Utils;
+using Meow.Audio;
 
 namespace Meow.ECS.Systems
 {
-    /// <summary>
-    /// Ä«¿îÅÍ(ÀÛ¾÷´ë) »óÈ£ÀÛ¿ë ½Ã½ºÅÛ
-    /// 
-    /// ¿ªÇÒ:
-    /// 1. ÇÃ·¹ÀÌ¾î -> Ä«¿îÅÍ: ¾ÆÀÌÅÛ ³õ±â (Push & ¼ÒÀ¯±Ç ÀÌÀü)
-    /// 2. Ä«¿îÅÍ -> ÇÃ·¹ÀÌ¾î: ¾ÆÀÌÅÛ Áı±â (Pop & ¼ÒÀ¯±Ç º¹±¸)
-    /// </summary>
+    /// <summary>ì¹´ìš´í„° ìƒí˜¸ì‘ìš©: ë†“ê¸°/ì§‘ê¸°</summary>
+    [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateAfter(typeof(InteractionSystem))]
-    public partial class CounterInteractionSystem : SystemBase
+    public partial struct CounterInteractionSystem : ISystem
     {
-        private EndSimulationEntityCommandBufferSystem _ecbSystem;
+        [BurstCompile] public void OnCreate(ref SystemState state) { }
 
-        protected override void OnCreate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            base.OnCreate();
-            _ecbSystem = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
-        }
+            if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause) && pause.IsPaused) return;
 
-        protected override void OnUpdate()
-        {
-            var ecb = _ecbSystem.CreateCommandBuffer();
+            var ecb = new EntityCommandBuffer(Allocator.Temp);
 
-            // "Ä«¿îÅÍ ¿äÃ» ÅÂ±×(CounterRequestTag)"°¡ ºÙÀº ÇÃ·¹ÀÌ¾î¸¸ ÇÊÅÍ¸µ
             foreach (var (request, playerState, playerTransform, entity) in
                      SystemAPI.Query<RefRO<InteractionRequestComponent>, RefRW<PlayerStateComponent>, RefRO<LocalTransform>>()
-                         .WithAll<CounterRequestTag>()
-                         .WithEntityAccess())
+                              .WithAll<CounterRequestTag>()
+                              .WithEntityAccess())
             {
-                // 1. ´ë»ó Ä«¿îÅÍ Á¤º¸ °¡Á®¿À±â
                 Entity counterEntity = request.ValueRO.TargetStation;
 
-                // Ä«¿îÅÍ °ü·Ã µ¥ÀÌÅÍ Á¶È¸
                 var counterData = SystemAPI.GetComponent<CounterComponent>(counterEntity);
                 var itemBuffer = SystemAPI.GetBuffer<CounterItemSlot>(counterEntity);
                 var snapBuffer = SystemAPI.GetBuffer<CounterSnapPoint>(counterEntity);
                 var counterTransform = SystemAPI.GetComponent<LocalTransform>(counterEntity);
 
-                Debug.Log("========================================");
-                Debug.Log($"[Ä«¿îÅÍ »óÈ£ÀÛ¿ë] ÇöÀç ¾ÆÀÌÅÛ: {itemBuffer.Length} / {counterData.MaxItems}");
-
-                // ============================================================
-                // CASE 1: ÇÃ·¹ÀÌ¾î -> Ä«¿îÅÍ (³õ±â)
-                // ============================================================
                 if (playerState.ValueRO.IsHoldingItem)
                 {
-                    // Ä«¿îÅÍ°¡ ²Ë Ã¡´ÂÁö È®ÀÎ
-                    if (itemBuffer.Length >= counterData.MaxItems)
-                    {
-                        Debug.LogWarning("[½ÇÆĞ] Ä«¿îÅÍ°¡ ²Ë Ã¡½À´Ï´Ù!");
-                    }
-                    else
+                    if (itemBuffer.Length < counterData.MaxItems)
                     {
                         Entity heldItem = playerState.ValueRO.HeldItemEntity;
-
-                        // 1. Ä«¿îÅÍ ¹öÆÛ¿¡ µî·Ï (Stack Push)
                         itemBuffer.Add(new CounterItemSlot { ItemEntity = heldItem });
 
-                        // 2. ¾ÆÀÌÅÛ À§Ä¡ ÀÌµ¿ (½º³À Æ÷ÀÎÆ® °è»ê)
                         int slotIndex = itemBuffer.Length - 1;
-                        float3 snapLocalPos = float3.zero;
+                        float3 snapLocalPos = (slotIndex < snapBuffer.Length)
+                            ? snapBuffer[slotIndex].LocalPosition
+                            : new float3(0, 1.0f, 0);
 
-                        // ½º³À Æ÷ÀÎÆ®°¡ ÀÖÀ¸¸é »ç¿ë, ¾øÀ¸¸é Áß¾Ó (0, 1, 0)
-                        if (slotIndex < snapBuffer.Length)
-                        {
-                            snapLocalPos = snapBuffer[slotIndex].LocalPosition;
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"[ÁÖÀÇ] ½½·Ô ÀÎµ¦½º({slotIndex})¿¡ ÇØ´çÇÏ´Â SnapPoint°¡ ¾ø½À´Ï´Ù! Áß¾Ó¿¡ µÓ´Ï´Ù.");
-                            snapLocalPos = new float3(0, 1.0f, 0);
-                        }
-
-                        // Ä«¿îÅÍÀÇ È¸Àü(Rotation)À» ¹İ¿µÇÏ¿© ¿ùµå ÁÂÇ¥ °è»ê
                         float3 worldPos = counterTransform.Position + math.rotate(counterTransform.Rotation, snapLocalPos);
 
-                        // À§Ä¡ ¼³Á¤ (ÀÌ °ªÀ» ItemVisualSystemÀÌ µû¶ó°¨)
-                        ecb.SetComponent(heldItem, new LocalTransform
-                        {
-                            Position = worldPos,
-                            Rotation = quaternion.identity, // ¾ÆÀÌÅÛÀº Á¤¹æÇâ
-                            Scale = 1f
-                        });
+                        var stateCopy = playerState.ValueRO;
+                        InteractionHelper.DetachItemFromPlayer(
+                            ref ecb,
+                            entity,
+                            ref stateCopy,
+                            heldItem,
+                            counterEntity,
+                            worldPos,
+                            itemHasLocalTransform: true,
+                            itemHasHoldable: true
+                        );
+                        playerState.ValueRW = stateCopy;
 
-                        // ?? [ÇÙ½É ¼öÁ¤] ¼ÒÀ¯±Ç ÀÌÀü (ÇÃ·¹ÀÌ¾î -> Ä«¿îÅÍ)
-                        // ÀÌ°É ÇØÁà¾ß ItemVisualSystemÀÌ "¾î? ÁÖÀÎÀÌ ÇÃ·¹ÀÌ¾î°¡ ¾Æ´Ï³×?" ÇÏ°í ¸Ó¸® À§·Î ¾È °¡Á®°¨.
-                        ecb.SetComponent(heldItem, new HoldableComponent
-                        {
-                            HolderEntity = counterEntity
-                        });
-
-                        // 3. ÇÃ·¹ÀÌ¾î ¼Õ ºñ¿ì±â
-                        playerState.ValueRW.IsHoldingItem = false;
-                        playerState.ValueRW.HeldItemEntity = Entity.Null;
-
-                        Debug.Log($"[¼º°ø] ¾ÆÀÌÅÛÀ» Ä«¿îÅÍ ½½·Ô {slotIndex}¹ø¿¡ ³õ¾Ò½À´Ï´Ù.");
+                        AppendAudioEvent(counterEntity, ref ecb, ref state, SfxId.Pickup);
                     }
                 }
-                // ============================================================
-                // CASE 2: Ä«¿îÅÍ -> ÇÃ·¹ÀÌ¾î (°¡Á®¿À±â - LIFO)
-                // ============================================================
                 else
                 {
-                    // Ä«¿îÅÍ°¡ ºñ¾ú´ÂÁö È®ÀÎ
-                    if (itemBuffer.Length <= 0)
+                    if (itemBuffer.Length > 0)
                     {
-                        Debug.LogWarning("[½ÇÆĞ] Ä«¿îÅÍ°¡ ºñ¾îÀÖ½À´Ï´Ù!");
-                    }
-                    else
-                    {
-                        // 1. ¸¶Áö¸· ¾ÆÀÌÅÛ ²¨³»±â (Stack Pop)
                         int lastIndex = itemBuffer.Length - 1;
                         Entity targetItem = itemBuffer[lastIndex].ItemEntity;
-
-                        // ¹öÆÛ¿¡¼­ Á¦°Å
                         itemBuffer.RemoveAt(lastIndex);
 
-                        // 2. ÇÃ·¹ÀÌ¾î ¼ÕÀ¸·Î ÀÌµ¿ (À§Ä¡ ¼³Á¤)
-                        float3 handPos = playerTransform.ValueRO.Position + new float3(0, 1.5f, 0.5f);
+                        var stateCopy = playerState.ValueRO;
+                        InteractionHelper.AttachItemToPlayer(
+                            ref ecb,
+                            entity,
+                            ref stateCopy,
+                            playerTransform.ValueRO.Position,
+                            playerTransform.ValueRO.Rotation,
+                            targetItem,
+                            itemHasLocalTransform: true,
+                            itemHasHoldable: true
+                        );
+                        playerState.ValueRW = stateCopy;
 
-                        ecb.SetComponent(targetItem, new LocalTransform
-                        {
-                            Position = handPos,
-                            Rotation = quaternion.identity,
-                            Scale = 1f
-                        });
-
-                        // ?? [ÇÙ½É ¼öÁ¤] ¼ÒÀ¯±Ç º¹±¸ (Ä«¿îÅÍ -> ÇÃ·¹ÀÌ¾î)
-                        // ÀÌÁ¦ ´Ù½Ã ÇÃ·¹ÀÌ¾î ¸Ó¸® À§¸¦ µû¶ó´Ù´Ï°Ô µÊ.
-                        ecb.SetComponent(targetItem, new HoldableComponent
-                        {
-                            HolderEntity = entity // entity = ÇÃ·¹ÀÌ¾î
-                        });
-
-                        // 3. ÇÃ·¹ÀÌ¾î »óÅÂ °»½Å (¼Õ¿¡ Áã±â)
-                        playerState.ValueRW.IsHoldingItem = true;
-                        playerState.ValueRW.HeldItemEntity = targetItem;
-
-                        Debug.Log($"[¼º°ø] Ä«¿îÅÍ¿¡¼­ ¾ÆÀÌÅÛÀ» Áı¾ú½À´Ï´Ù. (³²Àº °³¼ö: {itemBuffer.Length})");
+                        AppendAudioEvent(counterEntity, ref ecb, ref state, SfxId.Pickup);
                     }
                 }
 
-                Debug.Log("========================================");
-
-                // ?? [¸¶¹«¸®] Ã³¸® ¿Ï·á! Æ÷½ºÆ®ÀÕ ¶¼±â
-                ecb.RemoveComponent<InteractionRequestComponent>(entity);
-                ecb.RemoveComponent<CounterRequestTag>(entity);
+                InteractionHelper.EndRequest<CounterRequestTag>(ref ecb, entity);
             }
+
+            ecb.Playback(state.EntityManager);
+            ecb.Dispose();
+        }
+
+        private static DynamicBuffer<AudioEvent> EnsureAudioBuffer(Entity target, ref EntityCommandBuffer ecb, ref SystemState state)
+        {
+            if (state.EntityManager.HasBuffer<AudioEvent>(target))
+                return state.EntityManager.GetBuffer<AudioEvent>(target);
+            return ecb.AddBuffer<AudioEvent>(target);
+        }
+
+        private static void AppendAudioEvent(Entity target, ref EntityCommandBuffer ecb, ref SystemState state, SfxId sfx)
+        {
+            var buffer = EnsureAudioBuffer(target, ref ecb, ref state);
+            buffer.Add(new AudioEvent { Sfx = sfx, Is2D = true });
         }
     }
 }

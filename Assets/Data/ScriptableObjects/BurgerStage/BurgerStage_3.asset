@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3160d2de038f6ba4ab205642926c00ef, type: 3}
+  m_Name: BurgerStage_3
+  m_EditorClassIdentifier: 
+  stageName: Stage_Burger
+  bgmId: 2
+  stageIndex: 0
+  stageLevel: 3
+  totalCustomers: 15
+  maxFailures: 3
+  spawnInterval: 8
+  customerWalkSpeed: 2
+  customerPatience: 40
+  maxQueueCapacity: 20
+  stageTimeLimitSeconds: 0
+  scoreMultiplier: 1.2
+  menuPool: 0a000000
+  startingBuffs: []
+  rewardBuffPool:
+  - {fileID: 11400000, guid: f2e4d3a7cb2c77443b0ea37e2d7cc97d, type: 2}
+  - {fileID: 11400000, guid: 15f1ed1899650de44aaa1670aff08f23, type: 2}
+  - {fileID: 11400000, guid: d00c6f439dae0474a8d823f1ce1c6176, type: 2}
+  - {fileID: 11400000, guid: 43e14eb7d884ce74b979d5e59fc5f004, type: 2}
+  - {fileID: 11400000, guid: 3baed825c184ce8498d236e72a0973cf, type: 2}
+  - {fileID: 11400000, guid: 3268b1774e0467f42a543b1c306f29a4, type: 2}
+  - {fileID: 11400000, guid: 47e04911b66f59e478d2e4848526ddb7, type: 2}
+  - {fileID: 11400000, guid: 3701d6c01a8ac314984d10698d99aa33, type: 2}
+  - {fileID: 11400000, guid: e1afb96528ab6834bb6063a8178a802f, type: 2}
+  - {fileID: 11400000, guid: 81fd959a40d750045b76fbf4748dbcc9, type: 2}
+  rewardEquipmentPool: []
+  rewardChoiceCount: 3

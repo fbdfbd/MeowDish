@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24c0bc2006d9f8648baff1cb9888f449, type: 3}
+  m_Name: BGMLibrary
+  m_EditorClassIdentifier: 
+  cues:
+  - id: 0
+    clip: {fileID: 8300000, guid: 00d3ad46d0a2e1c428d3f93f95e6bc83, type: 3}
+  - id: 1
+    clip: {fileID: 8300000, guid: c8e2149953a54054fb81c9dde85335f8, type: 3}
+  - id: 2
+    clip: {fileID: 8300000, guid: 52537293ae2dd1f45be08aceb9a040ee, type: 3}

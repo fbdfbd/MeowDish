@@ -17,14 +17,6 @@ namespace Meow.ECS.Components
 
     /// <summary>
     /// 현재 장착 중인 장비 ID
-    /// 
-    /// 사용법:
-    /// 0 = 장비 없음
-    /// 101 = 요리사 모자
-    /// 102 = 셰프 모자
-    /// ...
-    /// 
-    /// (나중에 ScriptableObject로 관리)
     /// </summary>
     public struct EquipmentSlots : IComponentData
     {

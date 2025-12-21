@@ -9,9 +9,6 @@ namespace Meow.ECS.Authoring
 {
     public class ContainerAuthoring : MonoBehaviour
     {
-        // =========================================================
-        // 1. 인스펙터 설정
-        // =========================================================
         [Header("컨테이너 설정")]
         public IngredientType providedIngredient = IngredientType.Bread;
         public bool allowReturn = true;
@@ -23,29 +20,22 @@ namespace Meow.ECS.Authoring
         [Header("물리 설정")]
         public Vector3 colliderSize = new Vector3(1.5f, 2f, 1.5f);
 
-        // =========================================================
-        // 2. 내부 변수
-        // =========================================================
         private Entity _containerEntity;
         private EntityManager _entityManager;
 
-        // =========================================================
-        // 3. 초기화 (목차)
-        // =========================================================
+        private BlobAssetReference<Unity.Physics.Collider> _colliderBlobRef;
+
+
         private void Start()
         {
             if (!InitializeEntityManager()) return;
 
             CreateContainerEntity();
 
-            SetupTransform();           // 위치, 회전
-            SetupGameLogicComponents(); // Station, Container, Interactable
-            SetupPhysics();             // 물리 (Collider, Rigidbody)
+            SetupTransform();          
+            SetupGameLogicComponents(); 
+            SetupPhysics();           
         }
-
-        // =========================================================
-        // 4. 세부 설정 메서드들
-        // =========================================================
 
         private bool InitializeEntityManager()
         {
@@ -82,7 +72,6 @@ namespace Meow.ECS.Authoring
 
         private void SetupGameLogicComponents()
         {
-            // 1. Station Component
             _entityManager.AddComponentData(_containerEntity, new StationComponent
             {
                 Type = StationType.Container,
@@ -90,7 +79,6 @@ namespace Meow.ECS.Authoring
                 PlacedItemEntity = Entity.Null
             });
 
-            // 2. Container Component
             _entityManager.AddComponentData(_containerEntity, new ContainerComponent
             {
                 ProvidedIngredient = providedIngredient,
@@ -98,7 +86,6 @@ namespace Meow.ECS.Authoring
                 IsInfinite = isInfinite
             });
 
-            // 3. Interactable Component
             _entityManager.AddComponentData(_containerEntity, new InteractableComponent
             {
                 IsActive = true
@@ -107,7 +94,6 @@ namespace Meow.ECS.Authoring
 
         private void SetupPhysics()
         {
-            // Box Geometry 생성
             var boxGeometry = new BoxGeometry
             {
                 Center = float3.zero,
@@ -116,31 +102,30 @@ namespace Meow.ECS.Authoring
                 BevelRadius = 0.05f
             };
 
-            // Collider 생성 (Layer 6)
-            var collider = Unity.Physics.BoxCollider.Create(
+            _colliderBlobRef = Unity.Physics.BoxCollider.Create(
                 boxGeometry,
                 new CollisionFilter
                 {
-                    BelongsTo = 1u << 6, // 예: Interactable Layer
+                    BelongsTo = 1u << 6, 
                     CollidesWith = ~0u,
                     GroupIndex = 0
                 }
             );
 
-            _entityManager.AddComponentData(_containerEntity, new PhysicsCollider { Value = collider });
-            _entityManager.AddComponentData(_containerEntity, new PhysicsVelocity()); // 정적이지만 필요할 수 있음
+
+            _entityManager.AddComponentData(_containerEntity, new PhysicsCollider { Value = _colliderBlobRef });
+
+            _entityManager.AddComponentData(_containerEntity, new PhysicsVelocity()); // 정적.. 필요?
             _entityManager.AddComponentData(_containerEntity, PhysicsMass.CreateKinematic(MassProperties.UnitSphere));
             _entityManager.AddComponent<Simulate>(_containerEntity);
             _entityManager.AddSharedComponent(_containerEntity, new PhysicsWorldIndex(0));
         }
 
-        // =========================================================
-        // 5. 업데이트 및 해제
-        // =========================================================
+
 
         private void LateUpdate()
         {
-            // 엔티티 위치를 게임오브젝트에 동기화 (필요시)
+            // 엔티티 위치 게임오브젝트 동기화
             if (_entityManager.Exists(_containerEntity))
             {
                 var lt = _entityManager.GetComponentData<LocalTransform>(_containerEntity);
@@ -155,6 +140,11 @@ namespace Meow.ECS.Authoring
 
         private void DisposeContainerResources()
         {
+            if (_colliderBlobRef.IsCreated)
+            {
+                _colliderBlobRef.Dispose();
+            }
+
             if (World.DefaultGameObjectInjectionWorld == null || !World.DefaultGameObjectInjectionWorld.IsCreated)
                 return;
 
@@ -162,23 +152,14 @@ namespace Meow.ECS.Authoring
 
             if (em.Exists(_containerEntity))
             {
-                // Collider 메모리 해제
-                if (em.HasComponent<PhysicsCollider>(_containerEntity))
-                {
-                    var collider = em.GetComponentData<PhysicsCollider>(_containerEntity);
-                    if (collider.Value.IsCreated)
-                    {
-                        collider.Value.Dispose();
-                    }
-                }
-
                 em.DestroyEntity(_containerEntity);
+                _containerEntity = Entity.Null;
             }
         }
 
-        // =========================================================
-        // 6. 디버그 (Gizmos)
-        // =========================================================
+
+
+
         private void OnDrawGizmosSelected()
         {
             Gizmos.color = Color.red;

@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 6227426091169096531}
   - component: {fileID: 8825741279128298888}
   - component: {fileID: 1539245072429425981}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: GameObject
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -95,7 +95,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8363506265016556839}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Meat
   m_TagString: Untagged
   m_Icon: {fileID: 0}

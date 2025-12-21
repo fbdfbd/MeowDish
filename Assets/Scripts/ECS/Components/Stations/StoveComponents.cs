@@ -1,31 +1,31 @@
-using Unity.Entities;
+ï»¿using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Meow.ECS.Components
 {
     /// <summary>
-    /// ½ºÅäºê ¼³Á¤ (±â°è Á¤º¸)
+    /// ìŠ¤í† ë¸Œ ì„¤ì •
     /// </summary>
     public struct StoveComponent : IComponentData
     {
-        /// <summary>Á¶¸® ¼Óµµ ¹èÀ² (1.0 = Á¤»ó, 2.0 = 2¹è ºü¸§)</summary>
+        /// <summary>ì¡°ë¦¬ ì†ë„ ë°°ìœ¨</summary>
         public float CookingSpeedMultiplier;
-
-        // CookDurationÀº ¾ÆÀÌÅÛ(CookableComponent)¿¡ ÀÖÀ¸´Ï ¿©±â¼± »®´Ï´Ù.
     }
 
     /// <summary>
-    /// ÇöÀç ½ºÅäºêÀÇ »óÅÂ (·±Å¸ÀÓ)
+    /// í˜„ì¬ ìŠ¤í† ë¸Œì˜ ìƒíƒœ
     /// </summary>
     public struct StoveCookingState : IComponentData
     {
-        public Entity ItemEntity; // ÇöÀç ¿Ã·ÁÁ® ÀÖ´Â ¾ÆÀÌÅÛ
-        public float CurrentCookProgress; // ÇöÀç ¾ó¸¶³ª ±¸¿öÁ³³ª (´©Àû ½Ã°£)
-        public bool IsCooking; // Áö±İ ºÒÀÌ ÄÑÁ® ÀÖ³ª?
+        public Entity ItemEntity;            // í˜„ì¬ ì˜¬ë ¤ì ¸ ìˆëŠ” ì•„ì´í…œ
+        public float CurrentCookProgress;    // ëˆ„ì  ì¡°ë¦¬ ì‹œê°„
+        public bool IsCooking;
+        public int SfxLoopHandle;            // ê·¸ë¦´ë§ ë£¨í”„ ì‚¬ìš´ë“œ í•¸ë“¤
+        public int SmokeLoopHandle;
     }
 
     /// <summary>
-    /// [Ãß°¡] ¾ÆÀÌÅÛÀÌ ³õÀÏ ½Ã°¢Àû À§Ä¡
+    /// ì•„ì´í…œ ì‹œê°ì  ìœ„ì¹˜
     /// </summary>
     public struct StoveSnapPoint : IComponentData
     {

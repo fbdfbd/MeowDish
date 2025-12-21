@@ -11,12 +11,11 @@ namespace Meow.ECS.Components
     }
 
     /// <summary>
-    /// "나 얘랑 상호작용 할래!" 라는 정보
-    /// 플레이어 엔티티에 부착됩니다.
+    /// 상호작용 요청 플레이어에부착
     /// </summary>
     public struct InteractionRequestComponent : IComponentData
     {
-        public Entity TargetStation; // 상호작용할 대상
+        public Entity TargetStation;
     }
 
 

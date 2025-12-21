@@ -26,9 +26,10 @@ namespace Meow.ECS.Components
         Raw = 0,      // 날것 (컨테이너에서 꺼낸 그대로)
         Chopped = 1,  // 썰림
         Cooked = 2,   // 익힘
-        Burnt = 3,   // 탐 (실패)
+        Burnt = 3,    // 탐 (실패)
         Dirty = 4,    // 더러움 (접시)
-        Clean = 5     // 깨끗함 (접시)
+        Clean = 5,    // 깨끗함 (접시)
+        Prepared = 6
     }
 
     /// <summary>
@@ -47,8 +48,8 @@ namespace Meow.ECS.Components
         Burger = 10,    
 
         // [추가]
-        Wrapper = 20,      // 비닐 포장지 (컨테이너에서 꺼냄)
-        WrappedBurger = 21 // 최종 완성품 (손님에게 서빙)
+        Wrapper = 20, 
+        WrappedBurger = 21 
     }
 
     /// <summary>
@@ -57,14 +58,14 @@ namespace Meow.ECS.Components
     public enum StationType
     {
         None = 0,
-        Container = 1,        // 컨테이너 (무한 재료)
-        Counter = 2,          // 임시 보관 테이블 (여러 아이템)
-        CuttingBoard = 3,     // 도마 (썰기 전용)
-        Stove = 4,            // 가스레인지/오븐 (굽기/조리)
-        Sink = 5,             // 싱크대 (세척)
-        Assembly = 6,         // 조립대 (요리 조합)
-        ServingCounter = 7,   // 서빙 카운터
-        TrashCan = 8          // 쓰레기통 (선택)
+        Container = 1,
+        Counter = 2,
+        CuttingBoard = 3,
+        Stove = 4,
+        Sink = 5,
+        Assembly = 6,
+        ServingCounter = 7,
+        TrashCan = 8
     }
 
     /// <summary>
@@ -73,9 +74,9 @@ namespace Meow.ECS.Components
     public enum WorkType
     {
         None = 0,
-        Chopping = 1,  // 자르기
-        Cooking = 2,   // 조리
-        Washing = 3    // 세척
+        Chopping = 1,
+        Cooking = 2,
+        Washing = 3
     }
 
     public enum CustomerState : byte
@@ -83,11 +84,11 @@ namespace Meow.ECS.Components
         Spawned,        // 막 태어남
         FindingLine,    // 줄 설 곳 찾는 중
         MovingToLine,   // 이동 중
-        WaitingInQueue, // 줄 서서 대기 (평온)
-        Ordering,       // 주문 중 (맨 앞)
-        WaitingLate,    // ?? 주문 중인데 너무 늦음! (화남/Angry)
-        Eating,         // 먹는 중
-        Leaving_Happy,  // 성공 퇴장 (행복/Happy)
-        Leaving_Angry   // 실패 퇴장 (울음/Cry)
+        WaitingInQueue, // 줄 대기
+        Ordering,       // 주문 중(맨 앞)
+        WaitingLate,    // 주문 중 늦음(빨간불 게이지, 애니메이션)
+        Eating,
+        Leaving_Happy,  // 성공 퇴장
+        Leaving_Angry   // 실패 퇴장
     }
 }

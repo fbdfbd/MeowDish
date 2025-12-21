@@ -11,25 +11,28 @@ namespace Meow.ECS.Components
         GameOver    // 폐업 (실패)
     }
 
+    public struct GamePauseComponent : IComponentData
+    {
+        public bool IsPaused;
+    }
 
-
-    // 전역 게임 데이터 (싱글톤으로 사용)
+    // 전역 게임 데이터
     public struct GameSessionComponent : IComponentData
     {
         public GameState State;
 
         // 스테이지 진행 정보
-        public int MaxFailures;      // 허용된 최대 실패 수 (예: 3)
+        public int MaxFailures;      // 허용된 최대 실패 수(생명)
         public int CurrentFailures;  // 현재 실패 수
 
         public int TotalCustomers;   // 오늘 방문할 총 손님 수
         public int ServedCustomers;  // 성공한 손님 수
-        public int ProcessedCount;   // 처리된 손님 수 (성공 + 실패 합계) -> 이게 Total이랑 같아지면 끝
+        public int ProcessedCount;
 
-        public int CurrentScore;     // 현재 점수
+        public int CurrentScore; 
+        public float ScoreMultiplier;
         public int CurrentStageLevel;
 
-        // ?? [최적화용] 버프가 적용되었는지 체크하는 플래그
         public bool IsStageInitialized;
     }
 

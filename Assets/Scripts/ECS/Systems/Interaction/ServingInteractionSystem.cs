@@ -1,133 +1,122 @@
+Ôªøusing Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
-using Unity.Transforms;
 using Unity.Mathematics;
-using UnityEngine;
+using Unity.Transforms;
 using Meow.ECS.Components;
+using Meow.ECS.Utils;
+using Meow.Audio;
+using Meow.Managers;
 
 namespace Meow.ECS.Systems
 {
+    [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateAfter(typeof(InteractionSystem))]
-    public partial class ServingInteractionSystem : SystemBase
+    public partial struct ServingInteractionSystem : ISystem
     {
-        private EndSimulationEntityCommandBufferSystem _ecbSystem;
+        [BurstCompile] public void OnCreate(ref SystemState state) { }
 
-        protected override void OnCreate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            base.OnCreate();
-            _ecbSystem = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
-        }
+            if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause) && pause.IsPaused) return;
 
-        protected override void OnUpdate()
-        {
-            var ecb = _ecbSystem.CreateCommandBuffer();
+            var em = state.EntityManager;
+            var ecb = new EntityCommandBuffer(Allocator.Temp);
 
-            // º≠∫˘ ø‰√ª¿Ã ¿÷¥¬ «√∑π¿ÃæÓ √£±‚
-            foreach (var (request, playerState, entity) in
-                     SystemAPI.Query<RefRO<InteractionRequestComponent>, RefRW<PlayerStateComponent>>()
-                         .WithAll<ServingRequestTag>()
-                         .WithEntityAccess())
+            foreach (var (request, playerState, playerTransform, entity) in
+                     SystemAPI.Query<RefRO<InteractionRequestComponent>, RefRW<PlayerStateComponent>, RefRO<LocalTransform>>()
+                              .WithAll<ServingRequestTag>()
+                              .WithEntityAccess())
             {
-                // [πÊæÓ ƒ⁄µÂ] ¿ÃπÃ √≥∏Æµ» ø‰√ª¿Ã∏È ∆–Ω∫
                 if (request.ValueRO.TargetStation == Entity.Null)
                 {
-                    ecb.RemoveComponent<InteractionRequestComponent>(entity);
-                    ecb.RemoveComponent<ServingRequestTag>(entity);
+                    InteractionHelper.EndRequest<ServingRequestTag>(ref ecb, entity);
                     continue;
                 }
 
                 Entity stationEntity = request.ValueRO.TargetStation;
-                var servingData = SystemAPI.GetComponent<ServingStationComponent>(stationEntity);
 
-                Debug.Log("========================================");
-                Debug.Log($"[º≠∫˘ Ω√µµ] «√∑π¿ÃæÓ -> Ω∫≈◊¿Ãº« {stationEntity.Index}");
-
-                // 1. «√∑π¿ÃæÓ∞° ¿ΩΩƒ¿ª µÈ∞Ì ¿÷¥¬∞°?
                 if (playerState.ValueRO.IsHoldingItem)
                 {
                     Entity heldItemEntity = playerState.ValueRO.HeldItemEntity;
-                    var itemData = SystemAPI.GetComponent<ItemComponent>(heldItemEntity);
+                    var itemData = em.GetComponentData<ItemComponent>(heldItemEntity);
 
-                    // 2. ∏« æ’ º’¥‘ √£±‚ (QueueIndex == 0 ¿Œ º’¥‘)
                     Entity targetCustomer = Entity.Null;
                     IngredientType orderedDish = IngredientType.None;
 
-                    // (√÷¿˚»≠∏¶ ¿ß«ÿ DynamicBufferø° º’¥‘ ∏Ò∑œ¿ª ∞¸∏Æ«“ ºˆµµ ¿÷¡ˆ∏∏, 
-                    // ¡ˆ±›¿∫ ∞£¥‹«œ∞‘ ¿¸√º º’¥‘ ¡ﬂ «ÿ¥Á ¡Ÿ¿« 0π¯¿ª √£Ω¿¥œ¥Ÿ.)
                     foreach (var (customer, customerEntity) in
                              SystemAPI.Query<RefRW<CustomerComponent>>()
                              .WithAll<CustomerTag>()
                              .WithEntityAccess())
                     {
-                        // ≥ª ¡Ÿø° º≠ ¿÷∞Ì, ∏« æ’¿Ã∞Ì, ¡÷πÆ/¥Î±‚ ªÛ≈¬¿Œ º’¥‘
                         if (customer.ValueRO.TargetStation == stationEntity &&
                             customer.ValueRO.QueueIndex == 0 &&
                             (customer.ValueRO.State == CustomerState.Ordering ||
-                             customer.ValueRO.State == CustomerState.WaitingInQueue || // ¥Î±‚ ¡ﬂ¿Œ ªÛ≈¬
+                             customer.ValueRO.State == CustomerState.WaitingInQueue ||
                              customer.ValueRO.State == CustomerState.WaitingLate))
                         {
                             targetCustomer = customerEntity;
                             orderedDish = customer.ValueRO.OrderDish;
-                            break; // √£¿Ω!
+                            break;
                         }
                     }
 
-                    if (targetCustomer != Entity.Null)
+                    if (targetCustomer != Entity.Null && itemData.IngredientType == orderedDish)
                     {
-                        // 3. ¡÷πÆ ¿œƒ° »Æ¿Œ
-                        if (itemData.IngredientType == orderedDish)
+                        var stateCopy = playerState.ValueRW;
+                        InteractionHelper.DestroyHeldItem(ref ecb, entity, ref stateCopy);
+                        playerState.ValueRW = stateCopy;
+
+                        var customerData = em.GetComponentData<CustomerComponent>(targetCustomer);
+                        customerData.State = CustomerState.Leaving_Happy;
+                        customerData.Patience = 0;
+                        ecb.SetComponent(targetCustomer, customerData);
+
+                        if (SystemAPI.TryGetSingletonRW<GameSessionComponent>(out var session))
                         {
-                            // ?? [º∫∞¯] º≠∫˘ øœ∑·!
-                            Debug.Log($"[º≠∫˘ º∫∞¯] º’¥‘¿Ã {orderedDish}∏¶ πﬁ∞Ì «‡∫π«ÿ«’¥œ¥Ÿ! ??");
-
-                            // A. ¿ΩΩƒ ªË¡¶ («√∑π¿ÃæÓ º’ø°º≠)
-                            ecb.DestroyEntity(heldItemEntity);
-                            playerState.ValueRW.IsHoldingItem = false;
-                            playerState.ValueRW.HeldItemEntity = Entity.Null;
-
-                            // B. º’¥‘ ªÛ≈¬ ∫Ø∞Ê -> Happy Leave
-                            // (¡÷¿«: ø©±‚º≠ πŸ∑Œ Destroy «œ¡ˆ æ ∞Ì ªÛ≈¬∏∏ πŸ≤ﬁ -> PatienceSystem¿Ã √≥∏Æ)
-                            var customerData = SystemAPI.GetComponent<CustomerComponent>(targetCustomer);
-                            customerData.State = CustomerState.Leaving_Happy;
-                            customerData.Patience = 0; // ¡ÔΩ√ ¥Î±‚ ¡æ∑·
-                                                       // ∫Ò¡÷æÛ π›¿¿¿ª ¿ß«ÿ ªÏ¬¶ µÙ∑π¿Ã∏¶ ¡Ÿ ºˆµµ ¿÷¿Ω (PatienceSystem ∑Œ¡˜ µ˚∏ß)
-
-                            ecb.SetComponent(targetCustomer, customerData);
-
-                            // C. ¡°ºˆ/µ∑ ¡ı∞° (≥™¡ﬂø° √ﬂ∞°)
-                            if (SystemAPI.TryGetSingletonRW<GameSessionComponent>(out var session))
-                            {
-                                session.ValueRW.CurrentScore += 100; //ø©±‚ «œµÂƒ⁄µ˘ ºˆ¡§«œ±‚..
-                                session.ValueRW.ServedCustomers++;
-                                session.ValueRW.ProcessedCount++; // √≥∏Æµ !
-                            }
-
-                            // D. ¥Î±‚ø≠ ∞¸∏Æ¥¬ PatienceSystem¿« Leaving √≥∏Æø°º≠ ¿⁄µø¿∏∑Œ µ 
-                            // (DecreaseQueueCount & UpdateQueueIndices)
+                            float scoreMultiplier = session.ValueRO.ScoreMultiplier > 0f ? session.ValueRO.ScoreMultiplier : 1f;
+                            session.ValueRW.CurrentScore += (int)math.round(100f * scoreMultiplier);
+                            session.ValueRW.ServedCustomers++;
+                            session.ValueRW.ProcessedCount++;
                         }
-                        else
-                        {
-                            // ? [Ω«∆–] ¿ﬂ∏¯µ» ¿ΩΩƒ
-                            Debug.LogWarning($"[º≠∫˘ Ω«∆–] º’¥‘ ¡÷πÆ: {orderedDish} / ∞°¡Æø¬ ∞Õ: {itemData.IngredientType}");
-                            // (º±≈√) º’¥‘ ¿Œ≥ªΩ…¿ª ±∞≈≥™, «√∑π¿ÃæÓ∞° ∞Ê¡˜µ«∞≈≥™...
-                        }
-                    }
-                    else
-                    {
-                        Debug.LogWarning("[º≠∫˘ Ω«∆–] πﬁ¿ª º’¥‘¿Ã æ¯Ω¿¥œ¥Ÿ! (æ∆¡˜ æ» ø‘∞≈≥™ ¡˝ø° ∞®)");
+
+                        // Ìïú Î≤àÎßå Î≤ÑÌçº ÌôïÎ≥¥ ÌõÑ Îëê Ïù¥Î≤§Ìä∏ Ï∂îÍ∞Ä
+                        var audioBuffer = EnsureAudioBuffer(stationEntity, ref ecb, ref state);
+                        audioBuffer.Add(new AudioEvent { Sfx = SfxId.Meow, Is2D = true, AllowDuplicate = true });
+                        audioBuffer.Add(new AudioEvent { Sfx = SfxId.Coins, Is2D = true, AllowDuplicate = true });
+
+                        float3 fxPos = playerTransform.ValueRO.Position + new float3(0f, 1.2f, 0.2f);
+                        AppendServingFxEvent(stationEntity, ref ecb, ref state, ParticleType.ServingSuccess, fxPos);
                     }
                 }
-                else
-                {
-                    Debug.LogWarning("[º≠∫˘ Ω«∆–] ∫Ûº’¿∏∑Œ º≠∫˘«“ ºˆ æ¯Ω¿¥œ¥Ÿ.");
-                }
 
-                Debug.Log("========================================");
-
-                // [∏∂π´∏Æ] ø‰√ª ¡¶∞≈
-                ecb.RemoveComponent<InteractionRequestComponent>(entity);
-                ecb.RemoveComponent<ServingRequestTag>(entity);
+                InteractionHelper.EndRequest<ServingRequestTag>(ref ecb, entity);
             }
+
+            ecb.Playback(em);
+            ecb.Dispose();
+        }
+
+        private static DynamicBuffer<AudioEvent> EnsureAudioBuffer(Entity target, ref EntityCommandBuffer ecb, ref SystemState state)
+        {
+            if (state.EntityManager.HasBuffer<AudioEvent>(target))
+                return state.EntityManager.GetBuffer<AudioEvent>(target);
+            return ecb.AddBuffer<AudioEvent>(target);
+        }
+
+        private static DynamicBuffer<ServingFxEvent> EnsureServingFxBuffer(Entity target, ref EntityCommandBuffer ecb, ref SystemState state)
+        {
+            if (state.EntityManager.HasBuffer<ServingFxEvent>(target))
+                return state.EntityManager.GetBuffer<ServingFxEvent>(target);
+            return ecb.AddBuffer<ServingFxEvent>(target);
+        }
+
+        private static void AppendServingFxEvent(Entity target, ref EntityCommandBuffer ecb, ref SystemState state, ParticleType particle, float3 pos)
+        {
+            var buffer = EnsureServingFxBuffer(target, ref ecb, ref state);
+            buffer.Add(new ServingFxEvent { Particle = particle, WorldPos = pos });
         }
     }
 }

@@ -1,10 +1,8 @@
 using Unity.Entities;
 using Unity.Transforms;
-using Unity.Mathematics;
 using UnityEngine;
 using Meow.ECS.Components;
 using Meow.Managers;
-using Meow.ECS.View; // Helper 네임스페이스
 
 namespace Meow.ECS.View
 {
@@ -17,9 +15,7 @@ namespace Meow.ECS.View
 
             var ecb = new EntityCommandBuffer(Unity.Collections.Allocator.Temp);
 
-            // ==================================================================
-            // 1. 생성 (Spawn)
-            // ==================================================================
+
             foreach (var (customer, transform, entity) in
                      SystemAPI.Query<RefRO<CustomerComponent>, RefRO<LocalTransform>>()
                      .WithNone<CustomerVisualReference>()
@@ -39,7 +35,7 @@ namespace Meow.ECS.View
                     }
                     else
                     {
-                        // 초기화: 주문 아이콘 & 초기 상태
+                        // 초기화
                         helper.SetupOrderUI(customer.ValueRO.OrderDish);
                         helper.UpdateVisuals(customer.ValueRO.State, true);
                     }
@@ -54,25 +50,23 @@ namespace Meow.ECS.View
                 }
             }
 
-            // ==================================================================
-            // 2. 동기화 (Sync)
-            // ==================================================================
+            // 동기화
             foreach (var (transform, visualRef, customer) in
                      SystemAPI.Query<RefRO<LocalTransform>, CustomerVisualReference, RefRO<CustomerComponent>>())
             {
                 if (visualRef.VisualObject != null)
                 {
-                    // A. 위치 동기화
+                    // 1) 위치 동기화
                     visualRef.VisualObject.transform.position = transform.ValueRO.Position;
                     visualRef.VisualObject.transform.rotation = transform.ValueRO.Rotation;
 
                     if (visualRef.Helper != null)
                     {
-                        // B. 상태 변화 감지 (표정/애니메이션)
+                        // 2) 상태 변화 감지(표정/애니메이션)
                         bool isStateChanged = (visualRef.LastState != customer.ValueRO.State);
                         visualRef.Helper.UpdateVisuals(customer.ValueRO.State, isStateChanged);
 
-                        // C. UI 갱신 (매 프레임 - 게이지)
+                        // 3) UI게이지 갱신
                         visualRef.Helper.UpdateUI(
                             customer.ValueRO.Patience,
                             customer.ValueRO.MaxPatience,
@@ -85,9 +79,7 @@ namespace Meow.ECS.View
                 }
             }
 
-            // ==================================================================
-            // 3. 반납 (Despawn)
-            // ==================================================================
+            // 반납
             foreach (var (visualRef, entity) in
                      SystemAPI.Query<CustomerVisualReference>()
                      .WithNone<CustomerComponent>()

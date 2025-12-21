@@ -19,6 +19,8 @@ namespace Meow.ECS.Authoring
         private Entity _trashCanEntity;
         private EntityManager _entityManager;
 
+        private BlobAssetReference<Unity.Physics.Collider> _colliderBlobRef;
+
         private void Start()
         {
             InitializeEntityManager();
@@ -57,18 +59,15 @@ namespace Meow.ECS.Authoring
 
         private void SetupGameLogicComponents()
         {
-            // 1. Station Component
             _entityManager.AddComponentData(_trashCanEntity, new StationComponent
             {
-                Type = StationType.TrashCan, // Enum에 TrashCan(8) 있어야 함!
+                Type = StationType.TrashCan,
                 StationID = stationID,
                 PlacedItemEntity = Entity.Null
             });
 
-            // 2. Interactable
             _entityManager.AddComponentData(_trashCanEntity, new InteractableComponent { IsActive = true });
 
-            // 3. TrashCan Component (빈 태그성 컴포넌트)
             _entityManager.AddComponentData(_trashCanEntity, new TrashCanComponent());
         }
 
@@ -76,13 +75,14 @@ namespace Meow.ECS.Authoring
         {
             var boxGeometry = new BoxGeometry
             {
-                Center = new float3(0, 0, 0), 
+                Center = new float3(0, 0, 0),
                 Orientation = quaternion.identity,
                 Size = new float3(colliderSize.x, colliderSize.y, colliderSize.z),
                 BevelRadius = 0.05f
             };
 
-            var collider = Unity.Physics.BoxCollider.Create(
+            // [수정 포인트 2] 멤버 변수에 할당하여 관리 시작
+            _colliderBlobRef = Unity.Physics.BoxCollider.Create(
                 boxGeometry,
                 new CollisionFilter
                 {
@@ -92,7 +92,9 @@ namespace Meow.ECS.Authoring
                 }
             );
 
-            _entityManager.AddComponentData(_trashCanEntity, new PhysicsCollider { Value = collider });
+            // 컴포넌트에는 참조값 전달
+            _entityManager.AddComponentData(_trashCanEntity, new PhysicsCollider { Value = _colliderBlobRef });
+
             _entityManager.AddComponentData(_trashCanEntity, new PhysicsVelocity());
             _entityManager.AddComponentData(_trashCanEntity, PhysicsMass.CreateKinematic(MassProperties.UnitSphere));
             _entityManager.AddComponent<Simulate>(_trashCanEntity);
@@ -110,26 +112,34 @@ namespace Meow.ECS.Authoring
 
         private void OnDestroy()
         {
+            DisposeTrashCanResources();
+        }
+
+        private void DisposeTrashCanResources()
+        {
+            if (_colliderBlobRef.IsCreated)
+            {
+                _colliderBlobRef.Dispose();
+            }
+
             if (World.DefaultGameObjectInjectionWorld == null) return;
             var em = World.DefaultGameObjectInjectionWorld.EntityManager;
 
             if (em.Exists(_trashCanEntity))
             {
-                if (em.HasComponent<PhysicsCollider>(_trashCanEntity))
-                {
-                    var col = em.GetComponentData<PhysicsCollider>(_trashCanEntity);
-                    if (col.Value.IsCreated) col.Value.Dispose();
-                }
                 em.DestroyEntity(_trashCanEntity);
+                _trashCanEntity = Entity.Null;
             }
         }
+
+
 
         private void OnDrawGizmosSelected()
         {
             if (this == null || gameObject == null) return;
-            Gizmos.color = Color.gray; // 쓰레기통은 회색
+            Gizmos.color = Color.gray; 
             if (transform != null)
-                Gizmos.DrawWireCube(transform.position + new Vector3(0, colliderSize.y * 0.5f, 0), colliderSize);
+                Gizmos.DrawWireCube(transform.position + new Vector3(0, 0, 0), colliderSize);
         }
     }
 }

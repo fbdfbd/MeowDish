@@ -3,20 +3,17 @@ using Unity.Entities;
 namespace Meow.ECS.Components
 {
     /// <summary>
-    /// 업그레이드 타입 (일차 완료 보상)
+    /// 업그레이드 타입
     /// </summary>
     public enum UpgradeType
     {
         MoveSpeed = 0,       // 이동속도
         ActionSpeed = 1,     // 작업속도
         AllSpeed = 2,        // 모든 속도
-        // TODO: 나중에 추가 (30개까지)
     }
 
     /// <summary>
     /// 획득한 영구 업그레이드
-    /// 
-    /// 사용 시점: Day 2 (24시간 후)
     /// </summary>
     public struct PermanentUpgrade : IBufferElementData
     {

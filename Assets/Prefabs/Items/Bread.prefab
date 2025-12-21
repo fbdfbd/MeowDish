@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 1618013497699650156}
   - component: {fileID: 6965640392991455184}
   - component: {fileID: 2137808741984031690}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bottom
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -97,7 +97,7 @@ GameObject:
   - component: {fileID: 5557643762232003939}
   - component: {fileID: 5860090320855298584}
   - component: {fileID: 1052894088625577789}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Top
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -181,7 +181,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8557249972661128266}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bread
   m_TagString: Untagged
   m_Icon: {fileID: 0}

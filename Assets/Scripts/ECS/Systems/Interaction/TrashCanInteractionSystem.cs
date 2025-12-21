@@ -1,80 +1,65 @@
+ï»¿using Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
-using Unity.Transforms;
-using Unity.Mathematics;
-using UnityEngine;
 using Meow.ECS.Components;
+using Meow.ECS.Utils;
+using Meow.Audio;
 
 namespace Meow.ECS.Systems
 {
-    /// <summary>
-    /// ¾²·¹±âÅë »óÈ£ÀÛ¿ë ½Ã½ºÅÛ
-    /// ¿ªÇÒ: ÇÃ·¹ÀÌ¾î°¡ µé°í ÀÖ´Â ¾ÆÀÌÅÛÀ» Á¦°Å(Destroy)ÇÔ
-    /// </summary>
+    /// <summary>ì“°ë ˆê¸°í†µ: ë“¤ê³  ìˆëŠ” ì•„ì´í…œ ì‚­ì œ</summary>
+    [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateAfter(typeof(InteractionSystem))]
-    public partial class TrashCanInteractionSystem : SystemBase
+    public partial struct TrashCanInteractionSystem : ISystem
     {
-        private EndSimulationEntityCommandBufferSystem _ecbSystem;
+        [BurstCompile] public void OnCreate(ref SystemState state) { }
 
-        protected override void OnCreate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            base.OnCreate();
-            _ecbSystem = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
-        }
+            if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause) && pause.IsPaused) return;
 
-        protected override void OnUpdate()
-        {
-            var ecb = _ecbSystem.CreateCommandBuffer();
+            var ecb = new EntityCommandBuffer(Allocator.Temp);
 
-            // "¾²·¹±âÅë ÅÂ±×(TrashCanRequestTag)"°¡ ºÙÀº ÇÃ·¹ÀÌ¾î¸¸ ÇÊÅÍ¸µ
             foreach (var (request, playerState, entity) in
                      SystemAPI.Query<RefRO<InteractionRequestComponent>, RefRW<PlayerStateComponent>>()
-                         .WithAll<TrashCanRequestTag>()
-                         .WithEntityAccess())
+                              .WithAll<TrashCanRequestTag>()
+                              .WithEntityAccess())
             {
-                // [¹æ¾î ÄÚµå] Á¶ÇÕ ½Ã½ºÅÛ µî¿¡ ÀÇÇØ ÀÌ¹Ì Ã³¸®µÇ¾úÀ¸¸é ÆĞ½º
                 if (request.ValueRO.TargetStation == Entity.Null)
                 {
-                    ecb.RemoveComponent<InteractionRequestComponent>(entity);
-                    ecb.RemoveComponent<TrashCanRequestTag>(entity);
+                    InteractionHelper.EndRequest<TrashCanRequestTag>(ref ecb, entity);
                     continue;
                 }
 
-                Debug.Log("========================================");
-
-                // ÇÃ·¹ÀÌ¾î°¡ ¾ÆÀÌÅÛÀ» µé°í ÀÖ´Â°¡?
                 if (playerState.ValueRO.IsHoldingItem)
                 {
-                    Entity heldItem = playerState.ValueRO.HeldItemEntity;
+                    var stateCopy = playerState.ValueRW;
+                    InteractionHelper.DestroyHeldItem(ref ecb, entity, ref stateCopy);
+                    playerState.ValueRW = stateCopy;
 
-                    // 1. ¾ÆÀÌÅÛ ÆÄ±« (ECS ¼¼°è¿¡¼­ »èÁ¦)
-                    // VisualSystemÀÌ ÀÌ°É °¨ÁöÇØ¼­ ÀÚµ¿À¸·Î GameObjectµµ ¹İ³³ÇÔ
-                    if (heldItem != Entity.Null)
-                    {
-                        // ¾î¶² ¾ÆÀÌÅÛÀÌ¾ú´ÂÁö ·Î±×¿ë (¼±ÅÃ)
-                        // var itemData = SystemAPI.GetComponent<ItemComponent>(heldItem);
-                        // Debug.Log($"[¾²·¹±âÅë] {itemData.IngredientType} ¹ö¸²!");
-
-                        ecb.DestroyEntity(heldItem);
-                    }
-
-                    // 2. ÇÃ·¹ÀÌ¾î ¼Õ ºñ¿ì±â
-                    playerState.ValueRW.IsHoldingItem = false;
-                    playerState.ValueRW.HeldItemEntity = Entity.Null;
-
-                    Debug.Log("[¼º°ø] ¾²·¹±âÅë¿¡ ¾ÆÀÌÅÛÀ» ¹ö·È½À´Ï´Ù. (¼ÓÀÌ ´Ù ½Ã¿øÇÏ³×¿ä!)");
-                }
-                else
-                {
-                    Debug.LogWarning("[½ÇÆĞ] ¹ö¸± ¾ÆÀÌÅÛÀÌ ¾ø½À´Ï´Ù! (ºó¼Õ)");
+                    AppendAudioEvent(request.ValueRO.TargetStation, ref ecb, ref state, SfxId.Cutting);
                 }
 
-                Debug.Log("========================================");
-
-                // [¸¶¹«¸®] ¿äÃ» Ã³¸® ¿Ï·á -> Æ÷½ºÆ®ÀÕ ¶¼±â
-                ecb.RemoveComponent<InteractionRequestComponent>(entity);
-                ecb.RemoveComponent<TrashCanRequestTag>(entity);
+                InteractionHelper.EndRequest<TrashCanRequestTag>(ref ecb, entity);
             }
+
+            ecb.Playback(state.EntityManager);
+            ecb.Dispose();
+        }
+
+        private static DynamicBuffer<AudioEvent> EnsureAudioBuffer(Entity target, ref EntityCommandBuffer ecb, ref SystemState state)
+        {
+            if (state.EntityManager.HasBuffer<AudioEvent>(target))
+                return state.EntityManager.GetBuffer<AudioEvent>(target);
+            return ecb.AddBuffer<AudioEvent>(target);
+        }
+
+        private static void AppendAudioEvent(Entity target, ref EntityCommandBuffer ecb, ref SystemState state, SfxId sfx)
+        {
+            var buffer = EnsureAudioBuffer(target, ref ecb, ref state);
+            buffer.Add(new AudioEvent { Sfx = sfx, Is2D = true, AllowDuplicate = false });
         }
     }
 }

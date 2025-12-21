@@ -23,16 +23,21 @@ namespace Meow.ECS.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause))
+            {
+                if (pause.IsPaused) return;
+            }
+
             float deltaTime = SystemAPI.Time.DeltaTime;
             var physicsWorldSingleton = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
             var physicsWorld = physicsWorldSingleton.PhysicsWorld;
 
-            // 1. 쿼리에 RefRO<UnitConfig> 추가 (Blob 접근용)
+            // 1) 쿼리에 RefRO<UnitConfig> 추가 (Blob 접근용)
             foreach (var (transform,
                           physicsVelocity,
                           input,
                           stats,
-                          config,  // <- 여기 추가!
+                          config,
                           playerState,
                           collider,
                           entity) in
@@ -41,7 +46,7 @@ namespace Meow.ECS.Systems
                          RefRW<PhysicsVelocity>,
                          RefRO<PlayerInputComponent>,
                          RefRO<PlayerStatsComponent>,
-                         RefRO<UnitConfig>, // <- 여기 추가!
+                         RefRO<UnitConfig>,
                          RefRW<PlayerStateComponent>,
                          RefRO<Unity.Physics.PhysicsCollider>>()
                          .WithEntityAccess())
@@ -51,14 +56,13 @@ namespace Meow.ECS.Systems
                 // 입력이 있을 때만 이동 처리
                 if (math.lengthsq(moveInput) > 0.001f)
                 {
-                    // 2. Blob 데이터 가져오기 (참조)
-                    // ref를 써서 복사 비용을 줄입니다.
+                    // 2) Blob 데이터 가져오기
                     ref var baseStats = ref config.ValueRO.BlobRef.Value;
 
                     float3 moveDir = new float3(moveInput.x, 0, moveInput.y);
                     moveDir = math.normalize(moveDir);
 
-                    // 3. 최종 속도 직접 계산
+                    // 3) 최종 속도 계산
                     // 공식: (Base + Bonus) * MoveMult * AllMult
                     float baseSpeed = baseStats.BaseMoveSpeed;
                     float bonusSpeed = stats.ValueRO.MoveSpeedBonus;
@@ -73,7 +77,7 @@ namespace Meow.ECS.Systems
                     // 이번 프레임 이동량
                     float3 desiredMove = moveDir * finalSpeed * deltaTime;
 
-                    // ----- 충돌 감지 및 처리 (RayCast / Sweep) -----
+                    // 충돌 감지 및 처리(RayCast / Sweep)
                     unsafe
                     {
                         var castInput = new ColliderCastInput
@@ -113,12 +117,12 @@ namespace Meow.ECS.Systems
 
                     physicsVelocity.ValueRW.Angular = float3.zero;
 
-                    // 4. 회전 처리 (Blob에서 회전 속도 가져오기)
+                    // 4) 회전 처리 (Blob에서 회전 속도 가져오기)
                     quaternion targetRot = quaternion.LookRotation(moveDir, math.up());
                     transform.ValueRW.Rotation = math.slerp(
                         transform.ValueRO.Rotation,
                         targetRot,
-                        baseStats.RotationSpeed * deltaTime // <- 여기서 Blob 값 사용
+                        baseStats.RotationSpeed * deltaTime
                     );
                 }
                 else

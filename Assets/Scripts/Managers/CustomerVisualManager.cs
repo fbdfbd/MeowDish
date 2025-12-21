@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
 
@@ -7,8 +8,11 @@ namespace Meow.Managers
     {
         public static CustomerVisualManager Instance { get; private set; }
 
-        [Header("손님 프리팹 (여러 개면 랜덤 가능)")]
+        [Header("손님 프리팹")]
         public GameObject customerPrefab;
+
+        private int _defaultCapacity = 10;
+        private int _maxSize = 50;
 
         private ObjectPool<GameObject> _pool;
 
@@ -17,20 +21,45 @@ namespace Meow.Managers
             Instance = this;
 
             _pool = new ObjectPool<GameObject>(
-                createFunc: () => Instantiate(customerPrefab, transform),
+                createFunc: CreateCustomer, 
                 actionOnGet: (obj) => obj.SetActive(true),
                 actionOnRelease: (obj) => obj.SetActive(false),
                 actionOnDestroy: (obj) => Destroy(obj),
-                defaultCapacity: 10,
-                maxSize: 50
+                collectionCheck: false, // 릴리즈 중복 체크 해제
+                defaultCapacity: _defaultCapacity,
+                maxSize: _maxSize
             );
+        }
+
+        private void Start()
+        {
+            PrewarmPool();
+        }
+
+        private GameObject CreateCustomer()
+        {
+            return Instantiate(customerPrefab, transform);
+        }
+
+        private void PrewarmPool()
+        {
+            List<GameObject> tempCustomers = new List<GameObject>(_defaultCapacity);
+
+            for (int i = 0; i < _defaultCapacity; i++)
+            {
+                tempCustomers.Add(_pool.Get());
+            }
+
+            foreach (var customer in tempCustomers)
+            {
+                _pool.Release(customer);
+            }
         }
 
         public GameObject SpawnCustomer(Vector3 position, Quaternion rotation)
         {
             GameObject obj = _pool.Get();
-            obj.transform.position = position;
-            obj.transform.rotation = rotation;
+            obj.transform.SetPositionAndRotation(position, rotation);
             return obj;
         }
 

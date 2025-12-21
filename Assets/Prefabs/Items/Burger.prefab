@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 5327535950479819226}
   - component: {fileID: 3398205180645642152}
   - component: {fileID: 5346959877841066208}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bottom
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -97,7 +97,7 @@ GameObject:
   - component: {fileID: 4494953609371577290}
   - component: {fileID: 4050088098998979684}
   - component: {fileID: 5028700650895771217}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Top
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -181,7 +181,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2237459364785485686}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Burger
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -217,7 +217,7 @@ GameObject:
   - component: {fileID: 6679414359643096159}
   - component: {fileID: 4947149015102496841}
   - component: {fileID: 4375960045351467725}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Meat
   m_TagString: Untagged
   m_Icon: {fileID: 0}
