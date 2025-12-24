@@ -1,4 +1,4 @@
-# MeowDish (Unity DOTS Cooking Game)
+# MeowDish 
 
 고양이 테마의 캐주얼 쿠킹/서빙 타이쿤 게임. DOTS(ECS)로 손님, 조리/서빙, 버프 시스템을 구현했습니다
 
