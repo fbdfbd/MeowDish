@@ -26,10 +26,4 @@ namespace Meow.ECS.Components
         public bool HasItem => PlacedItemEntity != Entity.Null;
     }
 
-    // 스테이션 타입 태그들
-
-    public struct ContainerStationTag : IComponentData { }
-    public struct CounterStationTag : IComponentData { }
-    public struct StoveStationTag : IComponentData { }
-    public struct TrashCanTag : IComponentData { }
 }

@@ -1,4 +1,3 @@
-using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
@@ -11,9 +10,6 @@ namespace Meow.ECS.Authoring
 {
     public class CounterAuthoring : MonoBehaviour
     {
-        // =========================================================
-        // 1. 인스펙터 설정
-        // =========================================================
         [Header("카운터 설정")]
         [Tooltip("초기 슬롯 개수")]
         public int initialSlotCount = 1;
