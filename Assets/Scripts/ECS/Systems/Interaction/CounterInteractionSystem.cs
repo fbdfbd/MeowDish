@@ -15,14 +15,19 @@ namespace Meow.ECS.Systems
     [UpdateAfter(typeof(InteractionSystem))]
     public partial struct CounterInteractionSystem : ISystem
     {
-        [BurstCompile] public void OnCreate(ref SystemState state) { }
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
+        }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
             if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause) && pause.IsPaused) return;
 
-            var ecb = new EntityCommandBuffer(Allocator.Temp);
+            var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+            var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
 
             foreach (var (request, playerState, playerTransform, entity) in
                      SystemAPI.Query<RefRO<InteractionRequestComponent>, RefRW<PlayerStateComponent>, RefRO<LocalTransform>>()
@@ -93,9 +98,6 @@ namespace Meow.ECS.Systems
 
                 InteractionHelper.EndRequest<CounterRequestTag>(ref ecb, entity);
             }
-
-            ecb.Playback(state.EntityManager);
-            ecb.Dispose();
         }
 
         private static DynamicBuffer<AudioEvent> EnsureAudioBuffer(Entity target, ref EntityCommandBuffer ecb, ref SystemState state)

@@ -1,62 +1,58 @@
-﻿using Unity.Entities;
-using UnityEngine;
+﻿using Unity.Burst;
+using Unity.Entities;
+using Unity.Mathematics;
 using Meow.ECS.Components;
-using Meow.Managers;
 
 namespace Meow.ECS.Systems
 {
-
+    [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
-    public partial class StoveCookingSystem : SystemBase
+    public partial struct StoveCookingSystem : ISystem
     {
-        private EndSimulationEntityCommandBufferSystem _ecbSystem;
-
-        private void StopLoop(RefRW<StoveCookingState> stoveState)
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
         {
-            if (stoveState.ValueRO.SfxLoopHandle != 0 && AudioManager.Instance != null)
-            {
-                AudioManager.Instance.StopLoop(stoveState.ValueRO.SfxLoopHandle);
-                stoveState.ValueRW.SfxLoopHandle = 0;
-            }
+            state.RequireForUpdate<StoveComponent>();
+            state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
         }
 
-        protected override void OnCreate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            _ecbSystem = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
-        }
-
-        protected override void OnUpdate()
-        {
-            if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause))
-            {
-                if (pause.IsPaused) return;
-            }
+            if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause) && pause.IsPaused)
+                return;
 
             float deltaTime = SystemAPI.Time.DeltaTime;
-            var ecb = _ecbSystem.CreateCommandBuffer();
+            var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+            var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
 
-            foreach (var (stoveState, stoveData, stoveEntity) in
+            foreach (var (stoveState, stoveData, entity) in
                      SystemAPI.Query<RefRW<StoveCookingState>, RefRO<StoveComponent>>()
-                         .WithEntityAccess())
+                              .WithEntityAccess())
             {
                 if (!stoveState.ValueRO.IsCooking)
                 {
-                    StopLoop(stoveState);
-                    continue;
-                }
-                if (stoveState.ValueRO.ItemEntity == Entity.Null || !SystemAPI.Exists(stoveState.ValueRO.ItemEntity))
-                {
-                    StopLoop(stoveState);
-                    stoveState.ValueRW.IsCooking = false;
+                    EmitStopFxIfNeeded(entity, stoveState, ref state, ref ecb);
                     continue;
                 }
 
-                Entity itemEntity = stoveState.ValueRO.ItemEntity;
+                var itemEntity = stoveState.ValueRO.ItemEntity;
+
+                if (itemEntity == Entity.Null || !SystemAPI.Exists(itemEntity))
+                {
+                    stoveState.ValueRW.IsCooking = false;
+                    stoveState.ValueRW.ItemEntity = Entity.Null;
+                    stoveState.ValueRW.CurrentCookProgress = 0f;
+                    EmitStopFxIfNeeded(entity, stoveState, ref state, ref ecb);
+                    continue;
+                }
 
                 if (!SystemAPI.HasComponent<CookableComponent>(itemEntity))
                 {
-                    StopLoop(stoveState);
                     stoveState.ValueRW.IsCooking = false;
+                    stoveState.ValueRW.ItemEntity = Entity.Null;
+                    stoveState.ValueRW.CurrentCookProgress = 0f;
+                    EmitStopFxIfNeeded(entity, stoveState, ref state, ref ecb);
                     continue;
                 }
 
@@ -72,7 +68,6 @@ namespace Meow.ECS.Systems
                 progress += deltaTime * stoveData.ValueRO.CookingSpeedMultiplier;
                 stoveState.ValueRW.CurrentCookProgress = progress;
 
-                // 아이템에 진행도 동기화
                 if (SystemAPI.HasComponent<CookingState>(itemEntity))
                 {
                     ecb.SetComponent(itemEntity, new CookingState { Elapsed = progress });
@@ -82,7 +77,6 @@ namespace Meow.ECS.Systems
                     ecb.AddComponent(itemEntity, new CookingState { Elapsed = progress });
                 }
 
-                // Raw > Cooked
                 if (item.State == ItemState.Raw && progress >= cookable.CookTime)
                 {
                     ecb.SetComponent(itemEntity, new ItemComponent
@@ -95,33 +89,63 @@ namespace Meow.ECS.Systems
 
                     ecb.RemoveComponent<RawItemTag>(itemEntity);
                     ecb.AddComponent<CookedItemTag>(itemEntity);
-
-                    Debug.Log($"[Stove] {item.IngredientType}가 Cooked");
                 }
 
-                // Cooked > Burnt
-                if (cookable.BurnTime > 0 && item.State == ItemState.Cooked && progress >= (cookable.CookTime + cookable.BurnTime))
+                if (cookable.BurnTime > 0 &&
+                    item.State == ItemState.Cooked &&
+                    progress >= (cookable.CookTime + cookable.BurnTime) &&
+                    SystemAPI.HasComponent<BurnableTag>(itemEntity))
                 {
-                    if (SystemAPI.HasComponent<BurnableTag>(itemEntity))
+                    ecb.SetComponent(itemEntity, new ItemComponent
                     {
-                        ecb.SetComponent(itemEntity, new ItemComponent
-                        {
-                            ItemID = item.ItemID,
-                            Type = item.Type,
-                            IngredientType = item.IngredientType,
-                            State = ItemState.Burnt
-                        });
+                        ItemID = item.ItemID,
+                        Type = item.Type,
+                        IngredientType = item.IngredientType,
+                        State = ItemState.Burnt
+                    });
 
-                        ecb.RemoveComponent<CookedItemTag>(itemEntity);
-                        ecb.AddComponent<BurnedItemTag>(itemEntity);
+                    ecb.RemoveComponent<CookedItemTag>(itemEntity);
+                    ecb.AddComponent<BurnedItemTag>(itemEntity);
 
-                        Debug.Log($"[Stove] {item.IngredientType}가 탔습니다");
-
-                        StopLoop(stoveState);
-                        stoveState.ValueRW.IsCooking = false;
-                    }
+                    stoveState.ValueRW.IsCooking = false;
+                    EmitBurnedFx(entity, itemEntity, ref state, ref ecb);
                 }
             }
+        }
+
+        private static void EmitStopFxIfNeeded(Entity stoveEntity, RefRW<StoveCookingState> stoveState, ref SystemState state, ref EntityCommandBuffer ecb)
+        {
+            var current = stoveState.ValueRO;
+            if (current.SfxLoopHandle == 0 && current.SmokeLoopHandle == 0)
+                return;
+
+            var buffer = EnsureFxBuffer(stoveEntity, ref state, ref ecb);
+            buffer.Add(new StoveFxEvent
+            {
+                Event = StoveFxEvent.Kind.StopCook,
+                WorldPos = float3.zero,
+                Rot = quaternion.identity,
+                Item = current.ItemEntity
+            });
+        }
+
+        private static void EmitBurnedFx(Entity stoveEntity, Entity itemEntity, ref SystemState state, ref EntityCommandBuffer ecb)
+        {
+            var buffer = EnsureFxBuffer(stoveEntity, ref state, ref ecb);
+            buffer.Add(new StoveFxEvent
+            {
+                Event = StoveFxEvent.Kind.Burned,
+                WorldPos = float3.zero,
+                Rot = quaternion.identity,
+                Item = itemEntity
+            });
+        }
+
+        private static DynamicBuffer<StoveFxEvent> EnsureFxBuffer(Entity stoveEntity, ref SystemState state, ref EntityCommandBuffer ecb)
+        {
+            if (state.EntityManager.HasBuffer<StoveFxEvent>(stoveEntity))
+                return state.EntityManager.GetBuffer<StoveFxEvent>(stoveEntity);
+            return ecb.AddBuffer<StoveFxEvent>(stoveEntity);
         }
     }
 }

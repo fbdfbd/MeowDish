@@ -234,9 +234,9 @@ namespace Meow.ECS.Authoring
                 string info = $"Player {PlayerId}";
 
                 if (playerState.IsHoldingItem)
-                    info += "\n?? Holding Item";
+                    info += "\n Holding Item";
                 if (playerState.IsNearStation)
-                    info += "\n?? Near Station";
+                    info += "\n Near Station";
 
                 UnityEditor.Handles.Label(labelPos, info, new GUIStyle()
                 {

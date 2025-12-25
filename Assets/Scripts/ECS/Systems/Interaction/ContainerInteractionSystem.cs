@@ -101,6 +101,7 @@ namespace Meow.ECS.Systems
             ecb.Dispose();
         }
 
+
         private static DynamicBuffer<AudioEvent> EnsureAudioBuffer(Entity target, ref EntityCommandBuffer ecb, ref SystemState state)
         {
             if (state.EntityManager.HasBuffer<AudioEvent>(target))

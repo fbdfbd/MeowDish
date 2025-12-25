@@ -15,7 +15,11 @@ namespace Meow.ECS.Systems
             public int LeavingIndex;
         }
 
-        [BurstCompile] public void OnCreate(ref SystemState state) { }
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
+        }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
@@ -23,10 +27,10 @@ namespace Meow.ECS.Systems
             if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause) && pause.IsPaused) return;
 
             float deltaTime = SystemAPI.Time.DeltaTime;
-            var ecb = new EntityCommandBuffer(Allocator.Temp);
+            var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+            var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
             var queueUpdates = new NativeList<QueueUpdateInfo>(Allocator.Temp);
 
-            // 인내심 감소 및 상태 변화
             foreach (var (customer, entity) in
                      SystemAPI.Query<RefRW<CustomerComponent>>()
                          .WithAll<CustomerTag>()
@@ -61,7 +65,6 @@ namespace Meow.ECS.Systems
                 }
             }
 
-            // 떠나는 손님 처리
             foreach (var (customer, entity) in
                      SystemAPI.Query<RefRW<CustomerComponent>>()
                          .WithAll<CustomerTag>()
@@ -89,7 +92,6 @@ namespace Meow.ECS.Systems
                 }
             }
 
-            // 대기열 당기기
             if (!queueUpdates.IsEmpty)
             {
                 foreach (var updateInfo in queueUpdates)
@@ -111,8 +113,6 @@ namespace Meow.ECS.Systems
             }
 
             queueUpdates.Dispose();
-            ecb.Playback(state.EntityManager);
-            ecb.Dispose();
         }
 
         private static void DecreaseQueueCount(Entity stationEntity, ref SystemState state)

@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 using Unity.Entities;
-using Unity.Mathematics;
 using Meow.ECS.Components;
 using Meow.ECS.Authoring;
 

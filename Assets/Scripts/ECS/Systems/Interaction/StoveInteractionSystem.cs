@@ -33,7 +33,7 @@ namespace Meow.ECS.Systems
                 var stoveSnap = SystemAPI.GetComponent<StoveSnapPoint>(stoveEntity);
                 var stoveTransform = SystemAPI.GetComponent<LocalTransform>(stoveEntity);
 
-                // CASE 1: 플레이어 -> 스토브 (올리기)
+                // CASE 1) 플레이어 -> 스토브 (올리기)
                 if (playerStateRW.ValueRO.IsHoldingItem)
                 {
                     if (stoveState.ValueRO.ItemEntity == Entity.Null)
@@ -78,7 +78,7 @@ namespace Meow.ECS.Systems
                         }
                     }
                 }
-                // CASE 2: 스토브 -> 플레이어 (꺼내기)
+                // CASE 2) 스토브 -> 플레이어 (꺼내기)
                 else
                 {
                     if (stoveState.ValueRO.ItemEntity != Entity.Null)

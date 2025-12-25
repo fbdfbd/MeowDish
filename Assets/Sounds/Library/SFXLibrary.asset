@@ -47,8 +47,6 @@ MonoBehaviour:
   - id: 11
     loop: 0
     clips:
-    - {fileID: 8300000, guid: fdec9cdff23ccec4bb24bef51e80f84c, type: 3}
-    - {fileID: 8300000, guid: b295089c4f433ee428f7da34dab65263, type: 3}
     - {fileID: 8300000, guid: ccd938bb4b6041b4bbc5757bc921c373, type: 3}
   - id: 19
     loop: 0

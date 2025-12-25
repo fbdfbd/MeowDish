@@ -57,7 +57,8 @@ namespace Meow.ECS.Systems
                                 state.SmokeLoopHandle = 0;
                                 dirty = true;
                             }
-                            AudioManager.Instance?.PlaySfx2D(SfxId.Pickup);
+                            if (fx.Item != Entity.Null)
+                                AudioManager.Instance?.PlaySfx2D(SfxId.Pickup);
                             break;
 
                         case StoveFxEvent.Kind.Cooked:

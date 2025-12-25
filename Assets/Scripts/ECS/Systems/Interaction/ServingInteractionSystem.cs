@@ -15,7 +15,10 @@ namespace Meow.ECS.Systems
     [UpdateAfter(typeof(InteractionSystem))]
     public partial struct ServingInteractionSystem : ISystem
     {
-        [BurstCompile] public void OnCreate(ref SystemState state) { }
+        [BurstCompile] public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
+        }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
@@ -23,7 +26,8 @@ namespace Meow.ECS.Systems
             if (SystemAPI.TryGetSingleton<GamePauseComponent>(out var pause) && pause.IsPaused) return;
 
             var em = state.EntityManager;
-            var ecb = new EntityCommandBuffer(Allocator.Temp);
+            var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+            var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
 
             foreach (var (request, playerState, playerTransform, entity) in
                      SystemAPI.Query<RefRO<InteractionRequestComponent>, RefRW<PlayerStateComponent>, RefRO<LocalTransform>>()
@@ -82,7 +86,6 @@ namespace Meow.ECS.Systems
                             session.ValueRW.ProcessedCount++;
                         }
 
-                        // 한 번만 버퍼 확보 후 두 이벤트 추가
                         var audioBuffer = EnsureAudioBuffer(stationEntity, ref ecb, ref state);
                         audioBuffer.Add(new AudioEvent { Sfx = SfxId.Meow, Is2D = true, AllowDuplicate = true });
                         audioBuffer.Add(new AudioEvent { Sfx = SfxId.Coins, Is2D = true, AllowDuplicate = true });
@@ -94,9 +97,6 @@ namespace Meow.ECS.Systems
 
                 InteractionHelper.EndRequest<ServingRequestTag>(ref ecb, entity);
             }
-
-            ecb.Playback(em);
-            ecb.Dispose();
         }
 
         private static DynamicBuffer<AudioEvent> EnsureAudioBuffer(Entity target, ref EntityCommandBuffer ecb, ref SystemState state)
