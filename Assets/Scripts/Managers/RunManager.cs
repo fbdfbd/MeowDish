@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using Unity.Entities;
 using Unity.Collections;
@@ -20,6 +20,7 @@ namespace Meow.Run
 
         [Header("State (runtime)")]
         [SerializeField] private RunState state = new();
+        private UpgradeLoadout _activeLoadout;
 
         private EntityManager EntityManager => World.DefaultGameObjectInjectionWorld.EntityManager;
 
@@ -59,9 +60,9 @@ namespace Meow.Run
         {
             InitializePauseEntity();
 
-            StartRun(runDefinition);
+            // StartRun(runDefinition);
 
-            // ºê¸´Áö ¿¬°á
+            // ë¸Œë¦¿ì§€ ì—°ê²°
             if (GameBridge.Instance != null)
             {
                 GameBridge.Instance.OnGetOwnedSkills = GetOwnedSkills;
@@ -92,10 +93,10 @@ namespace Meow.Run
         }
 
 
-        // Àç½ÃÀÛ ·ÎÁ÷
+        // ì¬ì‹œì‘ ë¡œì§
         public void RetryGame()
         {
-            Debug.Log("[RunManager] °ÔÀÓ Àç½ÃÀÛ ¸Å´ÏÀú ÆÄ±« ¹× ¾À ¸®·Îµå");
+            Debug.Log("[RunManager] ê²Œì„ ì¬ì‹œì‘ ë§¤ë‹ˆì € íŒŒê´´ ë° ì”¬ ë¦¬ë¡œë“œ");
 
             ResetGameSession();
 
@@ -104,7 +105,7 @@ namespace Meow.Run
             if (GameBridge.Instance != null)
                 GameBridge.Instance.OnRestartRequested -= RetryGame;
 
-            Destroy(gameObject); // Áßº¹ ¹æÁö ÆÄ±«
+            Destroy(gameObject); // ì¤‘ë³µ ë°©ì§€ íŒŒê´´
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
@@ -139,26 +140,35 @@ namespace Meow.Run
         }
 
 
-        // °ÔÀÓ ÁøÇà ·ÎÁ÷
-        public void StartRun(RunDefinitionSO def)
+        // ê²Œì„ ì§„í–‰ ë¡œì§
+        public void StartRun(RunDefinitionSO def, UpgradeLoadout loadout = default, int startStageIndex = 0)
         {
             if (def == null) return;
+            if (startStageIndex < 0 || (def.stages != null && startStageIndex >= def.stages.Count))
+            {
+                Debug.LogError($"[RunManager] ì˜ëª»ëœ startStageIndex {startStageIndex}");
+                return;
+            }
 
             ResetGameSession();
 
             runDefinition = def;
+            _activeLoadout = loadout;
             state.Reset();
             state.permanentBuffs.AddRange(def.startingBuffs);
+            if (_activeLoadout.resolvedSkills != null)
+                state.permanentBuffs.AddRange(_activeLoadout.resolvedSkills);
             ApplyStartingEquipment(def.startingEquipment);
+            // loadout ì ìš© ì§€ì ?
 
-            // ½ºÅ³ ¼±ÅÃºÎÅÍ
-            state.currentStageIndex = -1;
+            // ìŠ¤í‚¬ ì„ íƒë¶€í„°
+            state.currentStageIndex = startStageIndex - 1;
 
-            Debug.Log($"[RunManager] ½ÃÀÛ ½ºÅ³¼±ÅÃ");
+            Debug.Log($"[RunManager] ì‹œì‘ ìŠ¤í‚¬ì„ íƒ");
 
             if (def.stages.Count > 0)
             {
-                var firstStage = def.stages[0];
+                var firstStage = def.stages[startStageIndex];
                 var rewardController = FindAnyObjectByType<StageRewardController>();
                 if (rewardController != null)
                 {
@@ -176,15 +186,15 @@ namespace Meow.Run
         {
             if (runDefinition == null || index < 0 || index >= runDefinition.stages.Count)
             {
-                Debug.LogError("[RunManager] ½ºÅ×ÀÌÁö ¾øÀ½");
+                Debug.LogError("[RunManager] ìŠ¤í…Œì´ì§€ ì—†ìŒ");
                 return;
             }
-
+            
             var stage = runDefinition.stages[index];
             AudioManager.Instance?.PlayBgm(stage.bgmId);
             state.currentStageIndex = index;
 
-            // ECS Àû¿ë
+            // ECS ì ìš©
             var buffEffects = CalculateBuffEffects(stage);
             int adjustedTotalCustomers = GetAdjustedTotalCustomers(stage);
 
@@ -193,7 +203,7 @@ namespace Meow.Run
                 Debug.LogError("[RunManager] GameSessionComponent Missing!");
                 return;
             }
-
+            Debug.Log($"[RunManager] StartStage index={index}, stageName={stage.name}, stageLevel={stage.stageLevel}");
             ApplyStageToSpawners(stage, adjustedTotalCustomers, buffEffects);
             ApplyStageBuffs(stage);
 
@@ -216,7 +226,7 @@ namespace Meow.Run
                 int nextIndex = state.currentStageIndex + 1;
                 bool hasNextStage = (runDefinition != null && nextIndex < runDefinition.stages.Count);
 
-                // ´ÙÀ½ ½ºÅ×ÀÌÁö°¡ ÀÖÀ¸¸é ´ÙÀ½ ½ºÅ×ÀÌÁö º¸»ó > ¼±ÅÃ ³¡³ª¸é NextStage()
+                // ë‹¤ìŒ ìŠ¤í…Œì´ì§€ê°€ ìˆìœ¼ë©´ ë‹¤ìŒ ìŠ¤í…Œì´ì§€ ë³´ìƒ > ì„ íƒ ëë‚˜ë©´ NextStage()
                 if (hasNextStage)
                 {
                     var nextStage = runDefinition.stages[nextIndex];
@@ -241,27 +251,27 @@ namespace Meow.Run
                         FindAnyObjectByType<StageRewardController>()?.TriggerRewardForStage(nextStage);
                     }
                 }
-                // ¸¶Áö¸· ½ºÅ×ÀÌÁö¸é º¸»ó ¾øÀÌ ¹Ù·Î °á°ú
+                // ë§ˆì§€ë§‰ ìŠ¤í…Œì´ì§€ë©´ ë³´ìƒ ì—†ì´ ë°”ë¡œ ê²°ê³¼
                 else
                 {
                     if (GameBridge.Instance != null)
                     {
                         GameBridge.Instance.PlayClearEffect(() =>
                         {
-                            // °á°úÆĞ³Î¿¡¼­ Á¤Áö
+                            // ê²°ê³¼íŒ¨ë„ì—ì„œ ì •ì§€
                             GameBridge.Instance.SetPause(true, isSystemPause: true);
                             GameBridge.Instance.TriggerGameResult(true, state.totalScore);
                         });
                     }
                     else
                     {
-                        Debug.LogWarning("[RunManager] GameBridge ¾øÀ½ EndºÒ°¡");
+                        Debug.LogWarning("[RunManager] GameBridge ì—†ìŒ Endë¶ˆê°€");
                     }
                 }
             }
             else if (result == GameState.GameOver)
             {
-                Debug.Log("[RunManager] °ÔÀÓ ¿À¹ö");
+                Debug.Log("[RunManager] ê²Œì„ ì˜¤ë²„");
 
                 if (GameBridge.Instance != null)
                 {
@@ -274,7 +284,7 @@ namespace Meow.Run
         public void NextStage()
         {
             int next = state.currentStageIndex + 1;
-            Debug.Log($"[RunManager] NextStage ¿äÃ»µÊ -> {next}");
+            Debug.Log($"[RunManager] NextStage ìš”ì²­ë¨ -> {next}");
 
             if (runDefinition != null && next < runDefinition.stages.Count)
             {
@@ -282,7 +292,7 @@ namespace Meow.Run
             }
             else
             {
-                Debug.Log("[RunManager] ¸ğµç½ºÅ×ÀÌÁö ³¡");
+                Debug.Log("[RunManager] ëª¨ë“ ìŠ¤í…Œì´ì§€ ë");
                 if (GameBridge.Instance != null)
                     GameBridge.Instance.TriggerGameResult(true, state.totalScore);
             }
@@ -339,6 +349,7 @@ namespace Meow.Run
         private int GetAdjustedTotalCustomers(StageDefinitionSO stage)
         {
             int extra = CalculateAdditionalCustomers(stage);
+            extra += _activeLoadout.additionalCustomers;
             return Mathf.Max(0, stage.totalCustomers + extra);
         }
 
@@ -375,15 +386,18 @@ namespace Meow.Run
             var query = em.CreateEntityQuery(typeof(GameSessionComponent));
             if (!query.TryGetSingletonEntity<GameSessionComponent>(out Entity session)) return false;
 
+            float stageScoreMult = (stage.scoreMultiplier <= 0f) ? 1f : stage.scoreMultiplier;
+            float loadoutScoreMult = (_activeLoadout.scoreMultiplierBonus <= 0f) ? 1f : _activeLoadout.scoreMultiplierBonus;
+
             var data = em.GetComponentData<GameSessionComponent>(session);
             data.State = GameState.Playing;
-            data.MaxFailures = Mathf.Max(1, stage.maxFailures + effects.ExtraFailures);
+            data.MaxFailures = Mathf.Max(1, stage.maxFailures + effects.ExtraFailures + _activeLoadout.extraLives);
             data.CurrentFailures = Mathf.Min(state.totalFailures, data.MaxFailures);
             data.TotalCustomers = totalCustomers;
             data.ServedCustomers = 0;
             data.ProcessedCount = 0;
-            data.CurrentScore = state.totalScore;
-            data.ScoreMultiplier = effects.TipMultiplier;
+            data.CurrentScore = state.totalScore + _activeLoadout.bonusGold;
+            data.ScoreMultiplier = effects.TipMultiplier * stageScoreMult * loadoutScoreMult;
             data.CurrentStageLevel = stage.stageLevel;
             data.IsStageInitialized = false;
 
@@ -398,11 +412,15 @@ namespace Meow.Run
             foreach (var spawner in spawners)
             {
                 var data = em.GetComponentData<CustomerSpawnerComponent>(spawner);
+                float spawnMult = (_activeLoadout.spawnIntervalMultiplier <= 0f) ? 1f : _activeLoadout.spawnIntervalMultiplier;
+                float patienceMult = (_activeLoadout.patienceMultiplier <= 0f) ? 1f : _activeLoadout.patienceMultiplier;
+
                 float spawnInterval = stage.spawnInterval * (effects.SlowSpawnMultiplier > 0f ? effects.SlowSpawnMultiplier : 1f);
+                spawnInterval *= spawnMult;
                 data.SpawnInterval = Mathf.Max(0.01f, spawnInterval);
                 data.Timer = 0;
                 data.WalkSpeed = stage.customerWalkSpeed;
-                data.MaxPatience = stage.customerPatience;
+                data.MaxPatience = stage.customerPatience * patienceMult;
                 data.MaxCustomersPerStage = totalCustomers;
                 data.SpawnedCount = 0;
                 data.IsActive = true;
@@ -450,3 +468,4 @@ namespace Meow.Run
         }
     }
 }
+

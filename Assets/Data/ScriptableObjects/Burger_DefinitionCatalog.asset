@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c85c9768754a9654799cc1e733212a95, type: 3}
+  m_Name: Burger_DefinitionCatalog
+  m_EditorClassIdentifier: 
+  skills:
+  - {fileID: 11400000, guid: 60472a1ff51486f42b16f690fe8dc20d, type: 2}
+  - {fileID: 11400000, guid: f2e4d3a7cb2c77443b0ea37e2d7cc97d, type: 2}
+  - {fileID: 11400000, guid: 15f1ed1899650de44aaa1670aff08f23, type: 2}
+  - {fileID: 11400000, guid: 79a48256659e62d4aa117d4dc0db3e3c, type: 2}
+  - {fileID: 11400000, guid: 43e14eb7d884ce74b979d5e59fc5f004, type: 2}
+  - {fileID: 11400000, guid: d00c6f439dae0474a8d823f1ce1c6176, type: 2}
+  - {fileID: 11400000, guid: 1e82f238f46dd264fb97d532eba88523, type: 2}
+  - {fileID: 11400000, guid: 3baed825c184ce8498d236e72a0973cf, type: 2}
+  - {fileID: 11400000, guid: 3268b1774e0467f42a543b1c306f29a4, type: 2}
+  - {fileID: 11400000, guid: b04df7b0a686c5149b7184b6491e0c2c, type: 2}
+  - {fileID: 11400000, guid: 3701d6c01a8ac314984d10698d99aa33, type: 2}
+  - {fileID: 11400000, guid: 47e04911b66f59e478d2e4848526ddb7, type: 2}
+  - {fileID: 11400000, guid: 7862ab9cdd251314cacbd8a1d45a181f, type: 2}
+  - {fileID: 11400000, guid: e1afb96528ab6834bb6063a8178a802f, type: 2}
+  - {fileID: 11400000, guid: 81fd959a40d750045b76fbf4748dbcc9, type: 2}
