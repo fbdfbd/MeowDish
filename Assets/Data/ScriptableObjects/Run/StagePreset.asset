@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 806f7fdb585c14d42b22a301534b34eb, type: 3}
+  m_Name: StagePreset
+  m_EditorClassIdentifier: 
+  stageKey: 100
+  runDefinition: {fileID: 11400000, guid: 89cf86ec04d6ad948b8fb6df7a104170, type: 2}
+  startStageIndex: 0
+  defaultLoadout:
+    skillIds: []
+    equipmentIds: []
+    bonusGold: 0
+    extraLives: 0
+    spawnIntervalMultiplier: 0
+    patienceMultiplier: 0
+    additionalCustomers: 0
+    scoreMultiplierBonus: 0
+    rewardSkillIds: []
+    rewardEquipIds: []
+    resolvedSkills: []

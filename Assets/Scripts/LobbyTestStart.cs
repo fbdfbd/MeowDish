@@ -1,9 +1,7 @@
-using System.Collections.Generic;
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using Meow.Run;
-using Meow.Data;
 using Meow.Bootstrap;
 
 public class LobbyTestStart : MonoBehaviour
@@ -11,14 +9,13 @@ public class LobbyTestStart : MonoBehaviour
     [Header("UI")]
     public Button startButton;
 
-    [Header("Run / Stage")]
-    public RunDefinitionSO runDefinition;
-    public string stageSceneName = "Stage_Burger";
+    [Header("Stage Preset")]
+    public StagePresetCatalogSO stagePresetCatalog;
+    public string stageKey;
+    public StagePresetSO fallbackPreset; // ì¹´íƒˆë¡œê·¸ ì‹¤íŒ¨ ì‹œ ì‚¬ìš©
 
-    [Header("Test Loadout (id)")]
-    public List<string> testSkillIds;
-    public int bonusGold; 
-    public int extraLives;
+    [Header("Scene")]
+    public string stageSceneName = "Stage_Burger";
 
     private void Awake()
     {
@@ -31,28 +28,32 @@ public class LobbyTestStart : MonoBehaviour
 
     private void OnClick()
     {
-
-        // Â÷Æ®µ¥ÀÌÅÍ·Î?
-        var loadout = new UpgradeLoadout
+        StagePresetSO preset = null;
+        if (stagePresetCatalog != null && stagePresetCatalog.TryGet(stageKey, out var found))
         {
-            skillIds = testSkillIds,
-            bonusGold = bonusGold,
-            extraLives = extraLives,
-            spawnIntervalMultiplier = 1f,
-            patienceMultiplier = 1f,
-            additionalCustomers = 0,
-            scoreMultiplierBonus = 1f
-        };
+            preset = found;
+        }
+        else
+        {
+            preset = fallbackPreset;
+            Debug.LogWarning($"[LobbyTestStart] stageKey '{stageKey}'ë¥¼ ì¹´íƒˆë¡œê·¸ì—ì„œ ì°¾ì§€ ëª»í–ˆìŠµë‹ˆë‹¤. fallback ì‚¬ìš©: {preset?.name}");
+        }
 
-        // RunEntryContext µî·Ï
+        if (preset == null || preset.runDefinition == null)
+        {
+            Debug.LogError("[LobbyTestStart] StagePreset ë˜ëŠ” RunDefinitionì´ ì—†ìŠµë‹ˆë‹¤.");
+            return;
+        }
+
+        var loadout = preset.defaultLoadout; // id/ìˆ˜ì¹˜ ê¸°ë°˜
+
         RunBootstrap.Instance?.Register(new RunEntryContext
         {
-            run = runDefinition,
-            startStageIndex = 0,
+            run = preset.runDefinition,
+            startStageIndex = preset.startStageIndex,
             loadout = loadout
         });
 
-        // ½ºÅ×ÀÌÁö ¾À ·Îµå
         SceneManager.LoadScene(stageSceneName);
     }
 }

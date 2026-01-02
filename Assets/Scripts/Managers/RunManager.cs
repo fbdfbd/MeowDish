@@ -189,7 +189,7 @@ namespace Meow.Run
                 Debug.LogError("[RunManager] 스테이지 없음");
                 return;
             }
-            
+
             var stage = runDefinition.stages[index];
             AudioManager.Instance?.PlayBgm(stage.bgmId);
             state.currentStageIndex = index;
@@ -468,4 +468,3 @@ namespace Meow.Run
         }
     }
 }
-

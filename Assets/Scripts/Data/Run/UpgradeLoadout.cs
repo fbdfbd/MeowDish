@@ -3,6 +3,7 @@ using Meow.Data;
 
 namespace Meow.Run
 {
+    [System.Serializable]
     public struct UpgradeLoadout
     {
         public List<string> skillIds;         // 서버/유저 선택 스킬(id 기반)
@@ -11,7 +12,7 @@ namespace Meow.Run
         public int extraLives;
         public float spawnIntervalMultiplier; // 1.0 기본, <1 빠름
         public float patienceMultiplier;      // 1.0 기본
-        public int additionalCustomers;       // +/-
+        public int additionalCustomers;       // +/-, 기본 0
         public float scoreMultiplierBonus;    // 추가 배율 (1.0 기본)
         public List<string> rewardSkillIds;   // 보상 풀 오버라이드용 id
         public List<string> rewardEquipIds;

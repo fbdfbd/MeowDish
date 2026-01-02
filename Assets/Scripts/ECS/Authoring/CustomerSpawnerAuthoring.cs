@@ -3,7 +3,7 @@ using Unity.Entities;
 using Unity.Transforms;
 using UnityEngine;
 using Meow.ECS.Components;
-using Meow.Data;
+using Meow.Run;
 
 namespace Meow.ECS.Authoring
 {

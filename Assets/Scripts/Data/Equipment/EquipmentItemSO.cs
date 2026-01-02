@@ -1,7 +1,7 @@
 using UnityEngine;
 using Meow.ECS.Components;
 
-namespace Meow.Data
+namespace Meow.Run
 {
     [CreateAssetMenu(fileName = "EquipmentItem", menuName = "Meow/Equipment")]
     public class EquipmentItemSO : ScriptableObject

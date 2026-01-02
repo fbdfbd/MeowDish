@@ -372,11 +372,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   startButton: {fileID: 1124070969}
-  runDefinition: {fileID: 11400000, guid: 89cf86ec04d6ad948b8fb6df7a104170, type: 2}
+  stagePresetCatalog: {fileID: 11400000, guid: b75f69827c418704d9e9412caf755f8d, type: 2}
+  stageKey: 100
+  fallbackPreset: {fileID: 11400000, guid: daf902b697f7dc5448bd2efe637205ab, type: 2}
   stageSceneName: Stage_Burger
-  testSkillIds: []
-  bonusGold: 0
-  extraLives: 0
 --- !u!4 &243861439
 Transform:
   m_ObjectHideFlags: 0

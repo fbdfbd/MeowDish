@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meow.Data
+namespace Meow.Run
 {
     [CreateAssetMenu(fileName = "RunDefinition", menuName = "Meow/RunDefinition")]
     public class RunDefinitionSO : ScriptableObject

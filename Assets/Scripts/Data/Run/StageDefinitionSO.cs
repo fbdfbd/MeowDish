@@ -3,7 +3,7 @@ using UnityEngine;
 using Meow.ECS.Components;
 using Meow.Audio;
 
-namespace Meow.Data
+namespace Meow.Run
 {
     [CreateAssetMenu(fileName = "StageDefinition", menuName = "Meow/StageDefinition")]
     public class StageDefinitionSO : ScriptableObject

@@ -1,13 +1,13 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using Meow.Bootstrap;
-using Meow.Run;    // RunManager, DefinitionCatalog, UpgradeLoadout
-using Meow.Data;   // RunDefinitionSO, SkillDefinitionSO
+using Meow.Run;
+using Meow.Data;
 
 public class StageBootstrapper : MonoBehaviour
 {
     [Header("Catalog")]
-    public DefinitionCatalog catalog; // id → SO 매핑용
+    public DefinitionCatalog catalog;
 
     [Header("Fallback (씬 단독 실행용)")]
     public RunDefinitionSO defaultRunDefinition;
